@@ -6,5 +6,18 @@ namespace PhpDecide\Decision;
 
 final class AiMetadata
 {
+    public function __construct(
+        private string $explainStyle,
+        private array $keywords = []
+    ) {}
 
+    public function explainStyle(): string
+    {
+        return $this->explainStyle;
+    }
+
+    public function keywords(): array
+    {
+        return $this->keywords;
+    }
 }

@@ -1,6 +1,6 @@
 ## PHPDecide
 
-A decision memory and enforcement for PHP projects
+A decision memory and enforcement for PHP projects. \
 Stop re-deciding the same things. Make architectural decisions executable.
 
 ### The problem

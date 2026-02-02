@@ -33,6 +33,10 @@ final class Decision
     {
         return $this->status;
     }
+    public function isActive(): bool
+    {
+        return $this->status->isActive();
+    }
     public function date(): DateTimeImmutable
     {
         return $this->date;
