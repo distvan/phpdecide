@@ -7,8 +7,8 @@ namespace PhpDecide\Decision;
 final class Rules
 {
     public function __construct(
-        private array $forbid = [],
-        private array $allow = []
+        private readonly array $forbid = [],
+        private readonly array $allow = []
     ) {}
     
     public function forbid(): array

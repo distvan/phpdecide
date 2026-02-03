@@ -9,7 +9,7 @@ use InvalidArgumentException;
 final class DecisionId
 {
     public function __construct(
-        private string $value
+        private readonly string $value
     ) {}
 
     public static function fromString(string $value): self

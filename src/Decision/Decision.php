@@ -9,16 +9,16 @@ use DateTimeImmutable;
 final class Decision
 {
     public function __construct(
-        private DecisionId $id,
-        private string $title,
-        private DecisionStatus $status,
-        private DateTimeImmutable $date,
-        private Scope $scope,
-        private DecisionContent $content,
-        private Examples $examples,
-        private ?Rules $rules,
-        private ?AiMetadata $aiMetadata = null,
-        private ?References $references = null
+        private readonly DecisionId $id,
+        private readonly string $title,
+        private readonly DecisionStatus $status,
+        private readonly DateTimeImmutable $date,
+        private readonly Scope $scope,
+        private readonly DecisionContent $content,
+        private readonly Examples $examples,
+        private readonly ?Rules $rules,
+        private readonly ?AiMetadata $aiMetadata = null,
+        private readonly ?References $references = null
     ) {}
 
     public function id(): DecisionId

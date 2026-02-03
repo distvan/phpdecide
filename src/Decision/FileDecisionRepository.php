@@ -8,13 +8,16 @@ namespace PhpDecide\Decision;
 final class FileDecisionRepository implements DecisionRepository
 {
     /** @var Decision[] */
-    private array $decisions = [];
+    private readonly array $decisions;
 
     public function __construct(DecisionLoader $loader)
     {
+        $decisions = [];
         foreach ($loader->load() as $decision) {
-            $this->decisions[$decision->id()->value()] = $decision;
+            $decisions[$decision->id()->value()] = $decision;
         }
+
+        $this->decisions = $decisions;
     }
 
     /**

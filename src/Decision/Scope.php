@@ -7,8 +7,8 @@ namespace PhpDecide\Decision;
 final class Scope
 {
     public function __construct(
-        private ScopeType $type,
-        private array $paths = [],
+        private readonly ScopeType $type,
+        private readonly array $paths = [],
     )
     {}
 

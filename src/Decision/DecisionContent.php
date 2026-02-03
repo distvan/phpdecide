@@ -7,9 +7,9 @@ namespace PhpDecide\Decision;
 final class DecisionContent
 {
     public function __construct(
-        private string $summary,
-        private array $rationale,
-        private array $alternatives = [],
+        private readonly string $summary,
+        private readonly array $rationale,
+        private readonly array $alternatives = [],
     ) {}
     public function summary(): string
     {

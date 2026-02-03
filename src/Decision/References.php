@@ -7,9 +7,9 @@ namespace PhpDecide\Decision;
 final class References
 {
     public function __construct(
-        private array $issues,
-        private array $commits,
-        private ?string $adr
+        private readonly array $issues,
+        private readonly array $commits,
+        private readonly ?string $adr
     )
     {}
     
