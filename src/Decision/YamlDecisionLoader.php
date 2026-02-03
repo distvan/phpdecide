@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PhpDecide\Decision;
 
+use Symfony\Component\Yaml\Yaml;
 use InvalidArgumentException;
+use DirectoryIterator;
+use UnexpectedValueException;
 
 final class YamlDecisionLoader implements DecisionLoader
 {
@@ -23,7 +26,24 @@ final class YamlDecisionLoader implements DecisionLoader
      */
     public function load(): iterable
     {
-        // Implementation for loading decisions from a YAML file goes here.
-        return [];
+        try {
+            foreach (new DirectoryIterator($this->directory) as $fileInfo) {
+                if (!$fileInfo->isFile() || (strtolower($fileInfo->getExtension()) !== 'yaml')) {
+                    continue;
+                }
+
+                $file = $fileInfo->getPathname();
+
+                $data = Yaml::parseFile($file);
+            
+                if (!is_array($data)) {
+                    throw new InvalidArgumentException("Invalid decision file: {$file}");
+                }
+                
+                yield DecisionFactory::fromArray($data);
+            }
+        } catch (UnexpectedValueException $e) {
+            throw new InvalidArgumentException("Unable to read directory: {$this->directory}", previous: $e);
+        }
     }
 }

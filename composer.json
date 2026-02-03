@@ -1,0 +1,31 @@
+{
+    "name": "distvan/phpdecide",
+    "description": "A decision memory and enforcement for PHP projects",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Istvan Dobrentei",
+            "homepage": "https://www.en.dobrenteiistvan.hu"
+        }
+    ],
+    "require": {
+        "symfony/yaml": "^7.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhpDecide\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpDecide\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}
