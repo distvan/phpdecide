@@ -1,0 +1,164 @@
+@startuml
+' PHPDecide - Decision domain model
+' Generated from src/Decision/*.php
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+set namespaceSeparator ::
+
+title PHPDecide - Decision Domain (src/Decision)
+
+package PhpDecide::Decision {
+
+  class Decision {
+    +__construct(
+      id: DecisionId,
+      title: string,
+      status: DecisionStatus,
+      date: DateTimeImmutable,
+      scope: Scope,
+      content: DecisionContent,
+      examples: Examples,
+      rules: Rules?,
+      aiMetadata: AiMetadata? = null,
+      references: References? = null
+    )
+    +id(): DecisionId
+    +title(): string
+    +status(): DecisionStatus
+    +isActive(): bool
+    +date(): DateTimeImmutable
+    +scope(): Scope
+    +content(): DecisionContent
+    +examples(): Examples
+    +rules(): Rules?
+    +aiMetadata(): AiMetadata?
+    +references(): References?
+  }
+
+  class DecisionId {
+    +__construct(value: string)
+    +fromString(value: string): DecisionId
+    +value(): string
+    +equals(other: DecisionId): bool
+  }
+
+  enum DecisionStatus {
+    ACTIVE
+    DEPRECATED
+    SUPERSEDED
+    +isActive(): bool
+  }
+
+  class Scope {
+    +__construct(type: ScopeType, paths: array = [])
+    +type(): ScopeType
+    +paths(): array
+    +appliesTo(path: string): bool
+  }
+
+  enum ScopeType {
+    GLOBAL
+    PATH
+    MODULE
+  }
+
+  class DecisionContent {
+    +__construct(summary: string, rationale: array, alternatives: array = [])
+    +summary(): string
+    +rationale(): array
+    +alternatives(): array
+  }
+
+  class Examples {
+    +__construct(allowed: array = [], forbidden: array = [])
+    +allowed(): array
+    +forbidden(): array
+  }
+
+  class Rules {
+    +__construct(forbid: array = [], allow: array = [])
+    +forbid(): array
+    +allow(): array
+    +hasRules(): bool
+  }
+
+  class AiMetadata {
+    +__construct(explainStyle: string, keywords: array = [])
+    +explainStyle(): string
+    +keywords(): array
+  }
+
+  class References {
+    +__construct(issues: array, commits: array, adr: string?)
+    +empty(): References
+    +issues(): array
+    +commits(): array
+    +adr(): string?
+  }
+
+  interface DecisionLoader {
+    +load(): iterable
+  }
+
+  class YamlDecisionLoader {
+    +__construct(directory: string)
+    +load(): iterable
+  }
+
+  interface DecisionRepository {
+    +all(): array
+    +active(): array
+    +findById(id: DecisionId): Decision?
+    +applicableTo(path: string): array
+    +searchByKeyword(keyword: string): array
+  }
+
+  class FileDecisionRepository {
+    +__construct(loader: DecisionLoader)
+    +all(): array
+    +active(): array
+    +findById(id: DecisionId): Decision?
+    +applicableTo(path: string): array
+    +searchByKeyword(keyword: string): array
+  }
+
+  class DecisionFactory {
+    +fromArray(data: array): Decision
+  }
+}
+
+' --- Composition / Aggregation relationships ---
+Decision *-- "1" DecisionId : id
+Decision *-- "1" DecisionContent : content
+Decision *-- "1" Examples : examples
+Decision *-- "1" Scope : scope
+Decision --> "1" DecisionStatus : status
+Decision o-- "0..1" Rules : rules
+Decision o-- "0..1" AiMetadata : aiMetadata
+Decision o-- "0..1" References : references
+
+Scope --> "1" ScopeType : type
+
+' --- Interfaces / implementations ---
+YamlDecisionLoader ..|> DecisionLoader
+FileDecisionRepository ..|> DecisionRepository
+
+' --- Dependencies (usage) ---
+FileDecisionRepository ..> DecisionLoader
+FileDecisionRepository ..> Decision
+FileDecisionRepository ..> DecisionId
+DecisionFactory ..> Decision
+DecisionFactory ..> DecisionId
+DecisionFactory ..> DecisionStatus
+DecisionFactory ..> Scope
+DecisionFactory ..> ScopeType
+DecisionFactory ..> DecisionContent
+DecisionFactory ..> Examples
+DecisionFactory ..> Rules
+DecisionFactory ..> AiMetadata
+DecisionFactory ..> References
+
+@enduml
