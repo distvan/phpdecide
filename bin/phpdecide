@@ -6,7 +6,18 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Symfony\Component\Console\Application;
 use PhpDecide\CLI\ExplainCommand;
 
-$application = new Application('PHP Decide', '0.1.0');
+$version = 'dev';
+try {
+	if (class_exists(\Composer\InstalledVersions::class)) {
+		$version = \Composer\InstalledVersions::getPrettyVersion('distvan/phpdecide')
+			?? \Composer\InstalledVersions::getVersion('distvan/phpdecide')
+			?? $version;
+	}
+} catch (\Throwable) {
+	// Fall back to "dev" if Composer metadata is unavailable.
+}
+
+$application = new Application('PHP Decide', $version);
 
 $application->addCommand(new ExplainCommand());
 
