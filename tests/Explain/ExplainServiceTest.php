@@ -14,6 +14,7 @@ final class ExplainServiceTest extends TestCase
 {
     private const TITLE_NO_ORMS = 'No ORMs';
     private const SUMMARY_RAW_SQL = 'Use raw SQL';
+    private const QUESTION_WHY_NO_ORMS = 'Why no ORMs?';
 
     public function testExplainReturnsNoMatchMessageWhenNothingMatches(): void
     {
@@ -36,7 +37,7 @@ final class ExplainServiceTest extends TestCase
         ]);
 
         $service = new ExplainService($repo);
-        $explanation = $service->explain('Why no ORMs?');
+        $explanation = $service->explain(self::QUESTION_WHY_NO_ORMS);
 
         self::assertTrue($explanation->hasDecisions());
         self::assertCount(1, $explanation->decisions());
@@ -71,9 +72,26 @@ final class ExplainServiceTest extends TestCase
         };
 
         $service = new ExplainService($repo, $ai);
-        $explanation = $service->explain('Why no ORMs?');
+        $explanation = $service->explain(self::QUESTION_WHY_NO_ORMS);
 
         self::assertSame('AI explanation', $explanation->message());
+    }
+
+    public function testExplainFiltersDecisionsByPathWhenProvided(): void
+    {
+        $repo = new InMemoryDecisionRepository([
+            $this->decisionWithScopePaths('DEC-0001', self::TITLE_NO_ORMS, self::SUMMARY_RAW_SQL, ['src/*']),
+        ]);
+
+        $service = new ExplainService($repo);
+
+        $notApplicable = $service->explain(self::QUESTION_WHY_NO_ORMS, 'tests/ExampleTest.php');
+        self::assertFalse($notApplicable->hasDecisions());
+
+        $applicable = $service->explain(self::QUESTION_WHY_NO_ORMS, 'src/Service/Foo.php');
+        self::assertTrue($applicable->hasDecisions());
+        self::assertCount(1, $applicable->decisions());
+        self::assertStringContainsString('[DEC-0001]', $applicable->message());
     }
 
     private function decision(string $id, string $title, string $summary): Decision
@@ -84,6 +102,25 @@ final class ExplainServiceTest extends TestCase
             'status' => 'active',
             'date' => '2026-02-03',
             'scope' => ['type' => 'global'],
+            'decision' => [
+                'summary' => $summary,
+                'rationale' => ['Because.'],
+            ],
+        ]);
+    }
+
+    /** @param string[] $paths */
+    private function decisionWithScopePaths(string $id, string $title, string $summary, array $paths): Decision
+    {
+        return DecisionFactory::fromArray([
+            'id' => $id,
+            'title' => $title,
+            'status' => 'active',
+            'date' => '2026-02-03',
+            'scope' => [
+                'type' => 'path',
+                'paths' => $paths,
+            ],
             'decision' => [
                 'summary' => $summary,
                 'rationale' => ['Because.'],

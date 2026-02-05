@@ -11,6 +11,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(
@@ -26,16 +27,24 @@ final class ExplainCommand extends Command
                 InputArgument::REQUIRED,
                 'The question you want to ask about project decisions.'
             );
+
+        $this->addOption(
+            'path',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'Optional file path to filter decisions by scope (only decisions applicable to this path will be considered).'
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $question = (string)$input->getArgument('question');
+        $path = (string)$input->getOption('path');
 
         $loader = new YamlDecisionLoader('.decisions');
         $repository = new FileDecisionRepository($loader);
         $explainService = new ExplainService($repository);
-        $explanation = $explainService->explain($question);
+        $explanation = $explainService->explain($question, $path);
 
         if (!$explanation->hasDecisions()) {
             $output->writeln('<comment>No recorded decision covers this topic.</comment>');

@@ -22,11 +22,19 @@ final class ExplainService
      * Explain the given question by matching it against recorded decisions.
      *
      * @param string $question
+     * @param string|null $path Optional path to filter decisions by scope
      * @return Explanation
      */
-    public function explain(string $question): Explanation
+    public function explain(string $question, ?string $path = null): Explanation
     {
         $decisions = $this->matcher->match($question);
+
+        if (!empty($path)) {
+            $decisions = array_values(array_filter(
+                $decisions,
+                fn(Decision $decision): bool => $decision->scope()->appliesTo($path)
+            ));
+        }
 
         if (empty($decisions)) {
             return new Explanation([], 'No recorded decision covers this topic.');

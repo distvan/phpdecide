@@ -12,6 +12,7 @@ final class ExplainCommandTest extends TestCase
 {
     private const TITLE_NO_ORMS = 'No ORMs';
     private const SUMMARY_RAW_SQL = 'Use raw SQL';
+    private const QUESTION_WHY_NO_ORMS = 'Why no ORMs?';
 
     private string $originalCwd;
 
@@ -71,7 +72,7 @@ final class ExplainCommandTest extends TestCase
         chdir($projectDir);
 
         $tester = new CommandTester(new ExplainCommand());
-        $exitCode = $tester->execute(['question' => 'Why no ORMs?']);
+        $exitCode = $tester->execute(['question' => self::QUESTION_WHY_NO_ORMS]);
 
         self::assertSame(0, $exitCode);
 
@@ -90,7 +91,29 @@ final class ExplainCommandTest extends TestCase
         $tester = new CommandTester(new ExplainCommand());
 
         $this->expectException(\InvalidArgumentException::class);
-        $tester->execute(['question' => 'Why no ORMs?']);
+        $tester->execute(['question' => self::QUESTION_WHY_NO_ORMS]);
+    }
+
+    public function testExecuteFiltersByPathWhenProvided(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $this->writeDecisionYaml(
+            $projectDir,
+            'DEC-0001-no-orms.yaml',
+            $this->decisionYamlWithScopePaths('DEC-0001', self::TITLE_NO_ORMS, self::SUMMARY_RAW_SQL, ['src/*'])
+        );
+
+        chdir($projectDir);
+
+        $tester = new CommandTester(new ExplainCommand());
+
+        $exitCode = $tester->execute(['question' => self::QUESTION_WHY_NO_ORMS, '--path' => 'tests/SomeTest.php']);
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('No recorded decision covers this topic.', $tester->getDisplay(true));
+
+        $exitCode = $tester->execute(['question' => self::QUESTION_WHY_NO_ORMS, '--path' => 'src/Foo.php']);
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('[DEC-0001]', $tester->getDisplay(true));
     }
 
     private function createTempProjectDir(bool $withDecisionsDir = true): string
@@ -130,6 +153,29 @@ decision:
     - Because it helps.
 YAML;
     }
+
+        /** @param string[] $paths */
+        private function decisionYamlWithScopePaths(string $id, string $title, string $summary, array $paths): string
+        {
+                $yamlPaths = '';
+                foreach ($paths as $path) {
+                        $yamlPaths .= "    - {$path}\n";
+                }
+
+                return <<<YAML
+id: {$id}
+title: {$title}
+status: active
+date: '2026-02-03'
+scope:
+    type: path
+    paths:
+{$yamlPaths}decision:
+    summary: {$summary}
+    rationale:
+        - Because it helps.
+YAML;
+        }
 
     private function removeDirRecursive(string $dir): void
     {
