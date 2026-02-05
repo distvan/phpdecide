@@ -55,8 +55,12 @@ final class DecisionMatcher
     private function tokenize(string $question): array
     {
         $question = mb_strtolower($question);
-        $question = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $question);
+        $question = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $question) ?? '';
 
-        return array_filter(explode(' ', $question), fn(string $part): bool => mb_strlen($part) > 2);
+        $parts = preg_split('/\s+/u', trim($question), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $tokens = array_filter($parts, fn(string $part): bool => mb_strlen($part) > 2);
+        $tokens = array_values(array_unique($tokens));
+
+        return $tokens;
     }
 }

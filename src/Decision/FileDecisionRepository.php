@@ -7,17 +7,34 @@ namespace PhpDecide\Decision;
 
 final class FileDecisionRepository implements DecisionRepository
 {
+    /** @var array<string, Decision> */
+    private readonly array $decisionsById;
+
     /** @var Decision[] */
-    private readonly array $decisions;
+    private readonly array $allDecisions;
+
+    /** @var Decision[] */
+    private readonly array $activeDecisions;
 
     public function __construct(DecisionLoader $loader)
     {
-        $decisions = [];
+        $decisionsById = [];
+        $allDecisions = [];
+        $activeDecisions = [];
+
         foreach ($loader->load() as $decision) {
-            $decisions[$decision->id()->value()] = $decision;
+            $id = $decision->id()->value();
+            $decisionsById[$id] = $decision;
+            $allDecisions[] = $decision;
+
+            if ($decision->isActive()) {
+                $activeDecisions[] = $decision;
+            }
         }
 
-        $this->decisions = $decisions;
+        $this->decisionsById = $decisionsById;
+        $this->allDecisions = $allDecisions;
+        $this->activeDecisions = $activeDecisions;
     }
 
     /**
@@ -25,7 +42,7 @@ final class FileDecisionRepository implements DecisionRepository
      */
     public function all(): array
     {
-        return array_values($this->decisions);
+        return $this->allDecisions;
     }
 
     /**
@@ -33,15 +50,12 @@ final class FileDecisionRepository implements DecisionRepository
      */
     public function active(): array
     {
-        return array_values(array_filter(
-            $this->decisions,
-            fn(Decision $decision) => $decision->isActive()
-        ));
+        return $this->activeDecisions;
     }
 
     public function findById(DecisionId $id): ?Decision
     {
-        return $this->decisions[$id->value()] ?? null;
+        return $this->decisionsById[$id->value()] ?? null;
     }
 
     /**
@@ -50,7 +64,7 @@ final class FileDecisionRepository implements DecisionRepository
     public function applicableTo(string $path): array
     {
         return array_values(array_filter(
-            $this->active(),
+            $this->activeDecisions,
             fn(Decision $decision) => $decision->scope()->appliesTo($path)
         ));
     }
@@ -63,7 +77,7 @@ final class FileDecisionRepository implements DecisionRepository
         $keyword = mb_strtolower($keyword);
 
         return array_values(array_filter(
-            $this->decisions,
+            $this->allDecisions,
             function (Decision $decision) use ($keyword):bool {
                 return $this->matchesKeyword($decision, $keyword);
             }
