@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpDecide\Decision;
 
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use InvalidArgumentException;
 use DirectoryIterator;
@@ -27,19 +28,28 @@ final class YamlDecisionLoader implements DecisionLoader
     public function load(): iterable
     {
         try {
+            $files = [];
             foreach (new DirectoryIterator($this->directory) as $fileInfo) {
-                if (!$fileInfo->isFile() || (strtolower($fileInfo->getExtension()) !== 'yaml')) {
+                if (!$fileInfo->isFile() || strtolower($fileInfo->getExtension()) !== 'yaml') {
                     continue;
                 }
 
-                $file = $fileInfo->getPathname();
+                $files[] = $fileInfo->getPathname();
+            }
 
-                $data = Yaml::parseFile($file);
-            
+            sort($files, SORT_STRING);
+
+            foreach ($files as $file) {
+                try {
+                    $data = Yaml::parseFile($file, Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE);
+                } catch (ParseException $e) {
+                    throw new InvalidArgumentException("Invalid YAML in decision file: {$file}", previous: $e);
+                }
+
                 if (!is_array($data)) {
                     throw new InvalidArgumentException("Invalid decision file: {$file}");
                 }
-                
+
                 yield DecisionFactory::fromArray($data);
             }
         } catch (UnexpectedValueException $e) {
