@@ -16,16 +16,22 @@ final class FileDecisionRepository implements DecisionRepository
     /** @var Decision[] */
     private readonly array $activeDecisions;
 
+    /** @var array<string, string> */
+    private readonly array $searchIndexLowerById;
+
     public function __construct(DecisionLoader $loader)
     {
         $decisionsById = [];
         $allDecisions = [];
         $activeDecisions = [];
+        $searchIndexLowerById = [];
 
         foreach ($loader->load() as $decision) {
             $id = $decision->id()->value();
             $decisionsById[$id] = $decision;
             $allDecisions[] = $decision;
+
+            $searchIndexLowerById[$id] = $this->buildSearchHaystackLower($decision);
 
             if ($decision->isActive()) {
                 $activeDecisions[] = $decision;
@@ -35,6 +41,7 @@ final class FileDecisionRepository implements DecisionRepository
         $this->decisionsById = $decisionsById;
         $this->allDecisions = $allDecisions;
         $this->activeDecisions = $activeDecisions;
+        $this->searchIndexLowerById = $searchIndexLowerById;
     }
 
     /**
@@ -86,6 +93,14 @@ final class FileDecisionRepository implements DecisionRepository
 
     private function matchesKeyword(Decision $decision, string $keyword): bool
     {
+        $id = $decision->id()->value();
+        $haystackLower = $this->searchIndexLowerById[$id] ?? $this->buildSearchHaystackLower($decision);
+
+        return str_contains($haystackLower, $keyword);
+    }
+
+    private function buildSearchHaystackLower(Decision $decision): string
+    {
         $haystack = implode(' ', [
             $decision->title(),
             $decision->content()->summary(),
@@ -93,9 +108,6 @@ final class FileDecisionRepository implements DecisionRepository
             implode(' ', $decision->aiMetadata()?->keywords() ?? []),
         ]);
 
-        return str_contains(
-            mb_strtolower($haystack),
-            $keyword
-        );
+        return mb_strtolower($haystack);
     }
 }

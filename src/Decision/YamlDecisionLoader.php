@@ -30,7 +30,7 @@ final class YamlDecisionLoader implements DecisionLoader
         try {
             $files = [];
             foreach (new DirectoryIterator($this->directory) as $fileInfo) {
-                if (!$fileInfo->isFile() || strtolower($fileInfo->getExtension()) !== 'yaml') {
+                if (!$fileInfo->isFile() || $fileInfo->isLink() || strtolower($fileInfo->getExtension()) !== 'yaml') {
                     continue;
                 }
 

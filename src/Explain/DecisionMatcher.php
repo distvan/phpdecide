@@ -13,6 +13,9 @@ final class DecisionMatcher
         private readonly DecisionRepository $repository
     ){}
 
+    /** @var array<string, string> */
+    private array $haystackLowerByDecisionId = [];
+
     /**
      * @return Decision[]
      */
@@ -36,7 +39,8 @@ final class DecisionMatcher
 
     private function matchesDecision(Decision $decision, array $tokens): bool
     {
-        $haystack = mb_strtolower(implode(' ', [
+        $id = $decision->id()->value();
+        $haystack = $this->haystackLowerByDecisionId[$id] ??= mb_strtolower(implode(' ', [
             $decision->title(),
             $decision->content()->summary(),
             implode(' ', $decision->content()->rationale()),
