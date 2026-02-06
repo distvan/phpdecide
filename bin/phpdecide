@@ -5,6 +5,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Console\Application;
 use PhpDecide\CLI\ExplainCommand;
+use PhpDecide\CLI\DecisionsLintCommand;
 
 $version = 'dev';
 try {
@@ -20,5 +21,6 @@ try {
 $application = new Application('PHP Decide', $version);
 
 $application->addCommand(new ExplainCommand());
+$application->addCommand(new DecisionsLintCommand());
 
 $application->run();
