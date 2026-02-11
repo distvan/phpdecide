@@ -58,8 +58,8 @@ Example topics:
 Decisions are stored as files
 ```
 .decisions/
-    DEC-0001-no-orm.yml
-    DEC-0002-controller-responsibilities.yml
+    DEC-0001-no-orm.yaml
+    DEC-0002-controller-responsibilities.yaml
 ```
 These files are human readable (YAML), diff friendly and stable over time.
 
@@ -99,6 +99,7 @@ This turns architecture from "guideline" into living constraints.
 - Rules come from teams.
 - AI exists to help humans understand and apply those decisions - nothing more.
 - If a rule is not recorded, AI has no authority to invent one.
+- AI support is a presentation layer: it summarizes recorded rationale and context; it does not create new decisions or rules.
 
 ### Who this is for
 
@@ -109,3 +110,20 @@ PHPDecide is ideal for:
 - Teams onboarding new developers frequently
 - Projects with architectural or security constraints
 - Organizations that value consistency and clarity
+
+### Quickstart (Phase 1: explain adoption)
+
+1) Create a `.decisions/` folder in your repo root and add your first decision file.
+
+2) Validate decisions locally (fast feedback):
+
+`php ./bin/phpdecide decisions:lint --require-any`
+
+3) Ask questions during reviews / onboarding:
+
+- Explain a topic:
+    - `php ./bin/phpdecide explain "Why no ORMs?"`
+- Explain with scope filtering (does it apply to this code path?):
+    - `php ./bin/phpdecide explain "Why no ORMs?" --path src/Order/OrderService.php`
+
+Tip: use [docs/decision-file-anatomy.md](docs/decision-file-anatomy.md) as the schema guide.

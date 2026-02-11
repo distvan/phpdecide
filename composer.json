@@ -27,6 +27,8 @@
         }
     },
     "scripts": {
+        "phpdecide": "php ./bin/phpdecide",
+        "decisions:lint": "php ./bin/phpdecide decisions:lint --require-any",
         "test": "phpunit"
     }
 }

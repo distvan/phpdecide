@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpDecide\Tests\CLI;
 
 use PhpDecide\CLI\ExplainCommand;
+use PhpDecide\Config\PhpDecideDefaults;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -116,6 +117,39 @@ final class ExplainCommandTest extends TestCase
         self::assertStringContainsString('[DEC-0001]', $tester->getDisplay(true));
     }
 
+    public function testExecuteAiStrictFailsWhenAiNotConfigured(): void
+    {
+        $previousApiKey = getenv('PHPDECIDE_AI_API_KEY');
+        putenv('PHPDECIDE_AI_API_KEY');
+
+        try {
+            $projectDir = $this->createTempProjectDir();
+            $this->writeDecisionYaml(
+                $projectDir,
+                'DEC-0001-no-orms.yaml',
+                $this->decisionYaml('DEC-0001', self::TITLE_NO_ORMS, self::SUMMARY_RAW_SQL)
+            );
+
+            chdir($projectDir);
+
+            $tester = new CommandTester(new ExplainCommand());
+            $exitCode = $tester->execute([
+                'question' => self::QUESTION_WHY_NO_ORMS,
+                '--ai' => true,
+                '--ai-strict' => true,
+            ]);
+
+            self::assertSame(1, $exitCode);
+            self::assertStringContainsString('AI is not configured', $tester->getDisplay(true));
+        } finally {
+            if ($previousApiKey !== false && is_string($previousApiKey) && $previousApiKey !== '') {
+                putenv('PHPDECIDE_AI_API_KEY=' . $previousApiKey);
+            } else {
+                putenv('PHPDECIDE_AI_API_KEY');
+            }
+        }
+    }
+
     private function createTempProjectDir(bool $withDecisionsDir = true): string
     {
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phpdecide_cli_tests_' . bin2hex(random_bytes(8));
@@ -126,7 +160,7 @@ final class ExplainCommandTest extends TestCase
         $this->tempDirs[] = $dir;
 
         if ($withDecisionsDir) {
-            mkdir($dir . DIRECTORY_SEPARATOR . '.decisions');
+            mkdir($dir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR);
         }
 
         return $dir;
@@ -134,7 +168,7 @@ final class ExplainCommandTest extends TestCase
 
     private function writeDecisionYaml(string $projectDir, string $filename, string $contents): void
     {
-        $path = $projectDir . DIRECTORY_SEPARATOR . '.decisions' . DIRECTORY_SEPARATOR . $filename;
+        $path = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR . DIRECTORY_SEPARATOR . $filename;
         file_put_contents($path, $contents);
     }
 

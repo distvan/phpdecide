@@ -73,9 +73,10 @@ final class ExplainService
         
         foreach ($decisions as $decision) {
             $lines[] = sprintf(
-                '- [%s] %s\n %s',
+                '- [%s] %s%s  %s',
                 $decision->id()->value(),
                 $decision->title(),
+                PHP_EOL,
                 $decision->content()->summary()
             );
         }

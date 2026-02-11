@@ -1,6 +1,6 @@
 @startuml
-' PHPDecide - Decision domain model
-' Generated from src/Decision/*.php
+' PHPDecide - Class diagram (overview)
+' Includes: Decision domain + Explain + AI + CLI
 
 skinparam shadowing false
 skinparam classAttributeIconSize 0
@@ -8,7 +8,22 @@ skinparam linetype ortho
 
 set namespaceSeparator ::
 
-title PHPDecide - Decision Domain (src/Decision)
+title PHPDecide - Class Diagram (src)
+
+package PhpDecide::Config {
+  class PhpDecideDefaults {
+    {static} +DECISIONS_DIR: string
+  }
+}
+
+package Symfony::Console {
+  abstract class Command <<Symfony>>
+}
+
+package Symfony::Yaml {
+  class Yaml <<Symfony>>
+  class ParseException <<Symfony>>
+}
 
 package PhpDecide::Decision {
 
@@ -130,6 +145,72 @@ package PhpDecide::Decision {
   }
 }
 
+package PhpDecide::AI {
+
+  interface AiClient {
+    +explainDecision(question: string, decisions: array): string
+  }
+
+  class AiClientFactory {
+    {static} +fromEnvironment(): AiClient?
+  }
+
+  class OpenAiChatCompletionsClient {
+    +__construct(
+      apiKey: string,
+      model: string,
+      baseUrl: string = "https://api.openai.com",
+      timeoutSeconds: int = 20,
+      organization: string? = null,
+      project: string? = null,
+      systemPromptOverride: string? = null
+    )
+    +explainDecision(question: string, decisions: array): string
+  }
+
+  class AiClientException
+}
+
+package PhpDecide::Explain {
+
+  interface AiExplainer {
+    +explain(question: string, decisions: array): string
+  }
+
+  class AiClientExplainer {
+    +__construct(client: PhpDecide::AI::AiClient)
+    +explain(question: string, decisions: array): string
+  }
+
+  class ExplainService {
+    +__construct(repository: PhpDecide::Decision::DecisionRepository, aiExplainer: AiExplainer? = null)
+    +explain(question: string, path: string? = null): Explanation
+  }
+
+  class DecisionMatcher {
+    +__construct(repository: PhpDecide::Decision::DecisionRepository)
+    +match(question: string): array
+  }
+
+  class Explanation {
+    +__construct(decisions: array, message: string)
+    +decisions(): array
+    +message(): string
+    +hasDecisions(): bool
+  }
+}
+
+package PhpDecide::CLI {
+
+  class ExplainCommand {
+    +execute(input, output): int
+  }
+
+  class DecisionsLintCommand {
+    +execute(input, output): int
+  }
+}
+
 ' --- Composition / Aggregation relationships ---
 Decision *-- "1" DecisionId : id
 Decision *-- "1" DecisionContent : content
@@ -145,6 +226,12 @@ Scope --> "1" ScopeType : type
 ' --- Interfaces / implementations ---
 YamlDecisionLoader ..|> DecisionLoader
 FileDecisionRepository ..|> DecisionRepository
+OpenAiChatCompletionsClient ..|> PhpDecide::AI::AiClient
+AiClientExplainer ..|> PhpDecide::Explain::AiExplainer
+
+' --- Inheritance ---
+PhpDecide::CLI::ExplainCommand --|> Symfony::Console::Command
+PhpDecide::CLI::DecisionsLintCommand --|> Symfony::Console::Command
 
 ' --- Dependencies (usage) ---
 FileDecisionRepository ..> DecisionLoader
@@ -160,5 +247,29 @@ DecisionFactory ..> Examples
 DecisionFactory ..> Rules
 DecisionFactory ..> AiMetadata
 DecisionFactory ..> References
+
+PhpDecide::CLI::ExplainCommand ..> PhpDecideDefaults
+PhpDecide::CLI::ExplainCommand ..> YamlDecisionLoader
+PhpDecide::CLI::ExplainCommand ..> FileDecisionRepository
+PhpDecide::CLI::ExplainCommand ..> PhpDecide::Explain::ExplainService
+PhpDecide::CLI::ExplainCommand ..> PhpDecide::AI::AiClientFactory
+PhpDecide::CLI::ExplainCommand ..> PhpDecide::Explain::AiClientExplainer
+
+PhpDecide::CLI::DecisionsLintCommand ..> PhpDecideDefaults
+PhpDecide::CLI::DecisionsLintCommand ..> DecisionFactory
+PhpDecide::CLI::DecisionsLintCommand ..> Symfony::Yaml::Yaml
+PhpDecide::CLI::DecisionsLintCommand ..> Symfony::Yaml::ParseException
+
+PhpDecide::Explain::ExplainService *-- PhpDecide::Explain::DecisionMatcher
+PhpDecide::Explain::ExplainService ..> PhpDecide::Decision::DecisionRepository
+PhpDecide::Explain::ExplainService ..> PhpDecide::Explain::AiExplainer
+
+PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::DecisionRepository
+PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::Decision
+PhpDecide::Explain::Explanation o-- "0..*" PhpDecide::Decision::Decision
+
+PhpDecide::AI::AiClientFactory ..> OpenAiChatCompletionsClient
+OpenAiChatCompletionsClient ..> PhpDecide::Decision::Decision
+OpenAiChatCompletionsClient ..> AiClientException
 
 @enduml

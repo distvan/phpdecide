@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PhpDecide\Tests\CLI;
 
 use PhpDecide\CLI\DecisionsLintCommand;
+use PhpDecide\Config\PhpDecideDefaults;
+use PhpDecide\Tests\Support\TestFilesystemException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -28,7 +30,7 @@ final class DecisionsLintCommandTest extends TestCase
     public function testSucceedsForValidDecisionYaml(): void
     {
         $projectDir = $this->createTempProjectDir();
-        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . '.decisions';
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
 
         $this->writeFile(
             $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-no-orms.yaml',
@@ -45,7 +47,7 @@ final class DecisionsLintCommandTest extends TestCase
     public function testFailsForInvalidYaml(): void
     {
         $projectDir = $this->createTempProjectDir();
-        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . '.decisions';
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
 
         $this->writeFile(
             $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-broken.yaml',
@@ -63,7 +65,7 @@ final class DecisionsLintCommandTest extends TestCase
     public function testFailsWhenRequiredFieldMissing(): void
     {
         $projectDir = $this->createTempProjectDir();
-        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . '.decisions';
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
 
         $this->writeFile(
             $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-missing-title.yaml',
@@ -90,7 +92,7 @@ YAML
     public function testFailsOnDuplicateDecisionIds(): void
     {
         $projectDir = $this->createTempProjectDir();
-        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . '.decisions';
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
 
         $this->writeFile(
             $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-a.yaml',
@@ -112,7 +114,7 @@ YAML
     public function testFailsWhenYmlExtensionIsUsed(): void
     {
         $projectDir = $this->createTempProjectDir();
-        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . '.decisions';
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
 
         $this->writeFile(
             $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001.yml',
@@ -129,7 +131,7 @@ YAML
     public function testSucceedsWhenNoDecisionFilesExistByDefault(): void
     {
         $projectDir = $this->createTempProjectDir();
-        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . '.decisions';
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
 
         $tester = new CommandTester(new DecisionsLintCommand());
         $exitCode = $tester->execute(['--dir' => $decisionsDir]);
@@ -142,12 +144,12 @@ YAML
     {
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phpdecide_lint_tests_' . bin2hex(random_bytes(8));
         if (!mkdir($dir) && !is_dir($dir)) {
-            throw new \RuntimeException("Unable to create temp dir: {$dir}");
+            throw new TestFilesystemException("Unable to create temp dir: {$dir}");
         }
 
         $this->tempDirs[] = $dir;
 
-        mkdir($dir . DIRECTORY_SEPARATOR . '.decisions');
+        mkdir($dir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR);
 
         return $dir;
     }
@@ -156,7 +158,7 @@ YAML
     {
         $bytes = file_put_contents($path, $contents);
         if ($bytes === false) {
-            throw new \RuntimeException("Unable to write file: {$path}");
+            throw new TestFilesystemException("Unable to write file: {$path}");
         }
     }
 

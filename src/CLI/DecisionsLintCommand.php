@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpDecide\CLI;
 
 use DirectoryIterator;
+use PhpDecide\Config\PhpDecideDefaults;
 use PhpDecide\Decision\DecisionFactory;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -13,6 +14,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use UnexpectedValueException;
+use InvalidArgumentException;
 
 #[AsCommand(
     name: 'decisions:lint',
@@ -27,7 +30,7 @@ final class DecisionsLintCommand extends Command
             null,
             InputOption::VALUE_REQUIRED,
             'Directory that contains decision files.',
-            '.decisions'
+            PhpDecideDefaults::DECISIONS_DIR
         );
 
         $this->addOption(
@@ -40,93 +43,155 @@ final class DecisionsLintCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $dir = (string) $input->getOption('dir');
-        if ($dir === '') {
-            $dir = '.decisions';
-        }
+        $dir = $this->resolveDir($input);
+        $requireAny = (bool) $input->getOption('require-any');
+
+        $exitCode = Command::SUCCESS;
 
         if (!is_dir($dir)) {
             $output->writeln(sprintf('<error>Decisions directory not found:</error> %s', $dir));
             return Command::FAILURE;
         }
 
-        $yamlFiles = [];
-        $errors = [];
-
         try {
-            foreach (new DirectoryIterator($dir) as $fileInfo) {
-                if (!$fileInfo->isFile() || $fileInfo->isLink()) {
-                    continue;
-                }
-
-                $ext = strtolower($fileInfo->getExtension());
-                if ($ext === 'yml') {
-                    $errors[] = sprintf(
-                        'Unsupported extension ".yml" (loader only reads ".yaml"): %s',
-                        $fileInfo->getFilename()
-                    );
-                    continue;
-                }
-
-                if ($ext === 'yaml') {
-                    $yamlFiles[] = $fileInfo->getPathname();
-                }
-            }
-        } catch (\UnexpectedValueException $e) {
+            [$yamlFiles, $errors] = $this->collectDecisionFiles($dir);
+        } catch (UnexpectedValueException) {
             $output->writeln(sprintf('<error>Unable to read directory:</error> %s', $dir));
             return Command::FAILURE;
         }
 
-        sort($yamlFiles, SORT_STRING);
+        if (empty($yamlFiles)) {
+            $exitCode = $this->reportNoYamlFiles($output, $dir, $errors, $requireAny);
+        } else {
+            [$decisions, $lintErrors] = $this->lintDecisionFiles($yamlFiles);
+            $errors = array_merge($errors, $lintErrors);
+            $errors = array_merge($errors, $this->duplicateIdErrors($decisions));
 
-        if (count($yamlFiles) === 0) {
-            if (count($errors) > 0) {
-                $output->writeln('<error>Decision lint failed.</error>');
-                foreach ($errors as $error) {
-                    $output->writeln(' - ' . $error);
-                }
-                return Command::FAILURE;
+            if (!empty($errors)) {
+                $this->printErrors($output, $errors);
+                $exitCode = Command::FAILURE;
+            } else {
+                $output->writeln(sprintf(
+                    '<info>OK</info> Linted %d file(s), loaded %d decision(s).',
+                    count($yamlFiles),
+                    count($decisions)
+                ));
+                $exitCode = Command::SUCCESS;
             }
-
-            $message = sprintf('No decision files found in %s', $dir);
-            if ((bool) $input->getOption('require-any')) {
-                $output->writeln('<error>' . $message . '</error>');
-                return Command::FAILURE;
-            }
-
-            $output->writeln('<comment>' . $message . '</comment>');
-            return Command::SUCCESS;
         }
 
-        $decisions = [];
+        return $exitCode;
+    }
 
-        foreach ($yamlFiles as $file) {
+    private function resolveDir(InputInterface $input): string
+    {
+        $dir = (string) $input->getOption('dir');
+        if ($dir === '') {
+            return PhpDecideDefaults::DECISIONS_DIR;
+        }
+
+        return $dir;
+    }
+
+    /**
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private function collectDecisionFiles(string $dir): array
+    {
+        $yamlFiles = [];
+        $errors = [];
+
+        foreach (new DirectoryIterator($dir) as $fileInfo) {
+            if (!$fileInfo->isFile() || $fileInfo->isLink()) {
+                continue;
+            }
+
+            $ext = strtolower($fileInfo->getExtension());
+            if ($ext === 'yml') {
+                $errors[] = sprintf(
+                    'Unsupported extension ".yml" (loader only reads ".yaml"): %s',
+                    $fileInfo->getFilename()
+                );
+                continue;
+            }
+
+            if ($ext === 'yaml') {
+                $yamlFiles[] = $fileInfo->getPathname();
+            }
+        }
+
+        sort($yamlFiles, SORT_STRING);
+
+        return [$yamlFiles, $errors];
+    }
+
+    /**
+     * @param list<string> $errors
+     */
+    private function reportNoYamlFiles(OutputInterface $output, string $dir, array $errors, bool $requireAny): int
+    {
+        if (!empty($errors)) {
+            $this->printErrors($output, $errors);
+            return Command::FAILURE;
+        }
+
+        $message = sprintf('No decision files found in %s', $dir);
+        if ($requireAny) {
+            $output->writeln('<error>' . $message . '</error>');
+            return Command::FAILURE;
+        }
+
+        $output->writeln('<comment>' . $message . '</comment>');
+        return Command::SUCCESS;
+    }
+
+    /**
+     * @param list<string> $files
+     * @return array{0: list<\PhpDecide\Decision\Decision>, 1: list<string>}
+     */
+    private function lintDecisionFiles(array $files): array
+    {
+        $decisions = [];
+        $errors = [];
+
+        foreach ($files as $file) {
+            $fileLabel = basename($file);
+
             try {
                 $data = Yaml::parseFile($file, Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE);
             } catch (ParseException $e) {
-                $errors[] = sprintf('%s: invalid YAML (%s)', basename($file), $e->getMessage());
+                $errors[] = sprintf('%s: invalid YAML (%s)', $fileLabel, $e->getMessage());
                 continue;
             }
 
             if (!is_array($data)) {
-                $errors[] = sprintf('%s: decision file must parse to a YAML mapping/object', basename($file));
+                $errors[] = sprintf('%s: decision file must parse to a YAML mapping/object', $fileLabel);
                 continue;
             }
 
             try {
                 $decision = DecisionFactory::fromArray($data);
                 $decisions[] = $decision;
-            } catch (\InvalidArgumentException $e) {
-                $errors[] = sprintf('%s: %s', basename($file), $e->getMessage());
+            } catch (InvalidArgumentException $e) {
+                $errors[] = sprintf('%s: %s', $fileLabel, $e->getMessage());
                 continue;
             }
 
-            // Extra strictness (lint-only): ensure list-like arrays contain only strings.
-            $errors = array_merge($errors, $this->validateDecisionArrays($data, basename($file)));
+            $errors = array_merge($errors, $this->validateDecisionArrays($data, $fileLabel));
         }
 
-        // Cross-file checks.
+        return [$decisions, $errors];
+    }
+
+    /**
+     * @param list<\PhpDecide\Decision\Decision> $decisions
+     * @return list<string>
+     */
+    private function duplicateIdErrors(array $decisions): array
+    {
+        $errors = [];
         $seenIds = [];
+
         foreach ($decisions as $decision) {
             $id = $decision->id()->value();
             if (isset($seenIds[$id])) {
@@ -136,21 +201,18 @@ final class DecisionsLintCommand extends Command
             $seenIds[$id] = true;
         }
 
-        if (count($errors) > 0) {
-            $output->writeln('<error>Decision lint failed.</error>');
-            foreach ($errors as $error) {
-                $output->writeln(' - ' . $error);
-            }
-            return Command::FAILURE;
+        return $errors;
+    }
+
+    /**
+     * @param list<string> $errors
+     */
+    private function printErrors(OutputInterface $output, array $errors): void
+    {
+        $output->writeln('<error>Decision lint failed.</error>');
+        foreach ($errors as $error) {
+            $output->writeln(' - ' . $error);
         }
-
-        $output->writeln(sprintf(
-            '<info>OK</info> Linted %d file(s), loaded %d decision(s).',
-            count($yamlFiles),
-            count($decisions)
-        ));
-
-        return Command::SUCCESS;
     }
 
     /**
@@ -160,74 +222,60 @@ final class DecisionsLintCommand extends Command
     {
         $errors = [];
 
-        // scope.paths
-        if (isset($data['scope']['paths']) && is_array($data['scope']['paths'])) {
-            foreach ($data['scope']['paths'] as $i => $pattern) {
-                if (!is_string($pattern) || trim($pattern) === '') {
-                    $errors[] = sprintf('%s: scope.paths[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
-            }
+        $errors = array_merge($errors, $this->validateStringListField($data, ['scope', 'paths'], 'scope.paths', $fileLabel));
+        $errors = array_merge($errors, $this->validateStringListField($data, ['decision', 'rationale'], 'decision.rationale', $fileLabel));
+        $errors = array_merge($errors, $this->validateStringListField($data, ['decision', 'alternatives'], 'decision.alternatives', $fileLabel));
+        $errors = array_merge($errors, $this->validateStringListField($data, ['examples', 'allowed'], 'examples.allowed', $fileLabel));
+        $errors = array_merge($errors, $this->validateStringListField($data, ['examples', 'forbidden'], 'examples.forbidden', $fileLabel));
+        $errors = array_merge($errors, $this->validateStringListField($data, ['rules', 'forbid'], 'rules.forbid', $fileLabel));
+        $errors = array_merge($errors, $this->validateStringListField($data, ['rules', 'allow'], 'rules.allow', $fileLabel));
+        $errors = array_merge($errors, $this->validateStringListField($data, ['ai', 'keywords'], 'ai.keywords', $fileLabel));
+
+        return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param list<string> $path
+     * @return list<string>
+     */
+    private function validateStringListField(array $data, array $path, string $fieldLabel, string $fileLabel): array
+    {
+        $value = $this->getNestedValue($data, $path);
+        if ($value === null) {
+            return [];
         }
 
-        // decision.rationale
-        if (isset($data['decision']['rationale']) && is_array($data['decision']['rationale'])) {
-            foreach ($data['decision']['rationale'] as $i => $item) {
-                if (!is_string($item) || trim($item) === '') {
-                    $errors[] = sprintf('%s: decision.rationale[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
-            }
+        if (!is_array($value)) {
+            return [sprintf('%s: %s must be an array of strings', $fileLabel, $fieldLabel)];
         }
 
-        // decision.alternatives
-        if (isset($data['decision']['alternatives']) && is_array($data['decision']['alternatives'])) {
-            foreach ($data['decision']['alternatives'] as $i => $item) {
-                if (!is_string($item) || trim($item) === '') {
-                    $errors[] = sprintf('%s: decision.alternatives[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
-            }
-        }
-
-        // examples.allowed/forbidden
-        if (isset($data['examples']['allowed']) && is_array($data['examples']['allowed'])) {
-            foreach ($data['examples']['allowed'] as $i => $item) {
-                if (!is_string($item) || trim($item) === '') {
-                    $errors[] = sprintf('%s: examples.allowed[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
-            }
-        }
-        if (isset($data['examples']['forbidden']) && is_array($data['examples']['forbidden'])) {
-            foreach ($data['examples']['forbidden'] as $i => $item) {
-                if (!is_string($item) || trim($item) === '') {
-                    $errors[] = sprintf('%s: examples.forbidden[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
-            }
-        }
-
-        // rules.allow/forbid
-        if (isset($data['rules']['forbid']) && is_array($data['rules']['forbid'])) {
-            foreach ($data['rules']['forbid'] as $i => $item) {
-                if (!is_string($item) || trim($item) === '') {
-                    $errors[] = sprintf('%s: rules.forbid[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
-            }
-        }
-        if (isset($data['rules']['allow']) && is_array($data['rules']['allow'])) {
-            foreach ($data['rules']['allow'] as $i => $item) {
-                if (!is_string($item) || trim($item) === '') {
-                    $errors[] = sprintf('%s: rules.allow[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
-            }
-        }
-
-        // ai.keywords
-        if (isset($data['ai']['keywords']) && is_array($data['ai']['keywords'])) {
-            foreach ($data['ai']['keywords'] as $i => $item) {
-                if (!is_string($item) || trim($item) === '') {
-                    $errors[] = sprintf('%s: ai.keywords[%d] must be a non-empty string', $fileLabel, (int) $i);
-                }
+        $errors = [];
+        foreach ($value as $i => $item) {
+            if (!is_string($item) || trim($item) === '') {
+                $errors[] = sprintf('%s: %s[%d] must be a non-empty string', $fileLabel, $fieldLabel, (int) $i);
             }
         }
 
         return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param list<string> $path
+     */
+    private function getNestedValue(array $data, array $path): mixed
+    {
+        $current = $data;
+
+        foreach ($path as $key) {
+            if (!is_array($current) || !array_key_exists($key, $current)) {
+                return null;
+            }
+
+            $current = $current[$key];
+        }
+
+        return $current;
     }
 }

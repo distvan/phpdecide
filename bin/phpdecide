@@ -9,13 +9,15 @@ use PhpDecide\CLI\DecisionsLintCommand;
 
 $version = 'dev';
 try {
-	if (class_exists(\Composer\InstalledVersions::class)) {
-		$version = \Composer\InstalledVersions::getPrettyVersion('distvan/phpdecide')
-			?? \Composer\InstalledVersions::getVersion('distvan/phpdecide')
-			?? $version;
-	}
+
+    if (class_exists(\Composer\InstalledVersions::class)) {
+        $version = \Composer\InstalledVersions::getPrettyVersion('distvan/phpdecide')
+            ?? \Composer\InstalledVersions::getVersion('distvan/phpdecide')
+            ?? $version;
+    }
 } catch (\Throwable) {
-	// Fall back to "dev" if Composer metadata is unavailable.
+
+    // Fall back to "dev" if Composer metadata is unavailable.
 }
 
 $application = new Application('PHP Decide', $version);
