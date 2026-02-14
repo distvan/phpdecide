@@ -226,13 +226,18 @@ PROMPT;
 
     private function applyTlsOptions(\CurlHandle $ch): void
     {
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+
         if ($this->caInfoPath !== null && trim($this->caInfoPath) !== '') {
             curl_setopt($ch, CURLOPT_CAINFO, $this->caInfoPath);
         }
 
         if ($this->insecureSkipVerify) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            throw new AiClientException(
+                'Insecure TLS verification (PHPDECIDE_AI_INSECURE) is not supported. ' .
+                'Configure PHPDECIDE_AI_CAINFO / CURL_CA_BUNDLE or fix your system trust store instead.'
+            );
         }
     }
 

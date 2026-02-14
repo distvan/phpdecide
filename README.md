@@ -127,3 +127,5 @@ PHPDecide is ideal for:
     - `php ./bin/phpdecide explain "Why no ORMs?" --path src/Order/OrderService.php`
 
 Tip: use [docs/decision-file-anatomy.md](docs/decision-file-anatomy.md) as the schema guide.
+
+AI note: if you enable `--ai` and hit TLS/certificate issues, configure `PHPDECIDE_AI_CAINFO` (CA bundle). TLS verification is enforced; there is no insecure/skip-verify mode.

@@ -70,6 +70,7 @@ final class ExplainCommand extends Command
             if ($client === null) {
                 $output->writeln('<error>AI is not configured.</error>');
                 $output->writeln('Set env vars like PHPDECIDE_AI_API_KEY and PHPDECIDE_AI_MODEL to enable AI mode.');
+                $output->writeln('If you hit TLS/certificate errors on Windows, set PHPDECIDE_AI_CAINFO (or CURL_CA_BUNDLE) to a CA bundle path.');
 
                 if ($aiStrict) {
                     return Command::FAILURE;
