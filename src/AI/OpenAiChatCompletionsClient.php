@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpDecide\AI;
 
 use PhpDecide\Decision\Decision;
+use InvalidArgumentException;
 
 final class OpenAiChatCompletionsClient implements AiClient
 {
@@ -20,11 +21,20 @@ final class OpenAiChatCompletionsClient implements AiClient
         private readonly bool $insecureSkipVerify = false,
     ) {
         if (trim($this->apiKey) === '') {
-            throw new \InvalidArgumentException('OpenAI API key must be a non-empty string.');
+            throw new InvalidArgumentException('OpenAI API key must be a non-empty string.');
         }
 
+        self::assertHeaderValueSafe($this->apiKey, 'OpenAI API key');
+
         if (trim($this->model) === '') {
-            throw new \InvalidArgumentException('OpenAI model must be a non-empty string.');
+            throw new InvalidArgumentException('OpenAI model must be a non-empty string.');
+        }
+
+        if ($this->organization !== null) {
+            self::assertHeaderValueSafe($this->organization, 'OpenAI organization');
+        }
+        if ($this->project !== null) {
+            self::assertHeaderValueSafe($this->project, 'OpenAI project');
         }
     }
 
@@ -169,13 +179,24 @@ PROMPT;
         ];
 
         if ($this->organization !== null && trim($this->organization) !== '') {
-            $headers[] = 'OpenAI-Organization: ' . trim($this->organization);
+            $org = trim($this->organization);
+            self::assertHeaderValueSafe($org, 'OpenAI-Organization');
+            $headers[] = 'OpenAI-Organization: ' . $org;
         }
         if ($this->project !== null && trim($this->project) !== '') {
-            $headers[] = 'OpenAI-Project: ' . trim($this->project);
+            $project = trim($this->project);
+            self::assertHeaderValueSafe($project, 'OpenAI-Project');
+            $headers[] = 'OpenAI-Project: ' . $project;
         }
 
         return $headers;
+    }
+
+    private static function assertHeaderValueSafe(string $value, string $label): void
+    {
+        if (str_contains($value, "\r") || str_contains($value, "\n")) {
+            throw new AiClientException($label . ' contains newline characters, which is not allowed.');
+        }
     }
 
     /**
@@ -189,11 +210,14 @@ PROMPT;
             throw new AiClientException('Unable to initialize cURL.');
         }
 
+        $connectTimeout = max(1, min(10, $this->timeoutSeconds));
+
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_POSTFIELDS => $json,
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $connectTimeout,
             CURLOPT_TIMEOUT => $this->timeoutSeconds,
         ]);
 

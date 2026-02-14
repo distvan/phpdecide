@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpDecide\AI;
 
+use InvalidArgumentException;
+
 final class AiClientFactory
 {
     public static function fromEnvironment(): ?AiClient
@@ -16,6 +18,7 @@ final class AiClientFactory
         $model = self::envString('PHPDECIDE_AI_MODEL') ?? 'gpt-4o-mini';
 
         $baseUrl = self::envString('PHPDECIDE_AI_BASE_URL') ?? 'https://api.openai.com';
+        self::assertSafeBaseUrl($baseUrl);
 
         $timeoutSeconds = self::envPositiveInt('PHPDECIDE_AI_TIMEOUT') ?? 20;
 
@@ -39,6 +42,42 @@ final class AiClientFactory
             caInfoPath: $caInfo,
             insecureSkipVerify: $insecureSkipVerify,
         );
+    }
+
+    private static function assertSafeBaseUrl(string $baseUrl): void
+    {
+        $parts = parse_url($baseUrl);
+        if (!is_array($parts)) {
+            throw new InvalidArgumentException('AI base URL is not a valid URL.');
+        }
+
+        $scheme = $parts['scheme'] ?? null;
+        $host = $parts['host'] ?? null;
+
+        if (!is_string($scheme) || $scheme === '') {
+            throw new InvalidArgumentException('AI base URL must include a URL scheme (https://...).');
+        }
+
+        $scheme = strtolower($scheme);
+        if ($scheme === 'https') {
+            return;
+        }
+
+        if ($scheme === 'http') {
+            if (!is_string($host) || $host === '') {
+                throw new InvalidArgumentException('AI base URL must include a host.');
+            }
+
+            $host = strtolower($host);
+            $isLoopback = $host === 'localhost' || $host === '127.0.0.1' || $host === '::1';
+            if ($isLoopback) {
+                return;
+            }
+
+            throw new InvalidArgumentException('AI base URL must use https:// (http:// is only allowed for localhost).');
+        }
+
+        throw new InvalidArgumentException('AI base URL must use https:// (or http://localhost for local testing).');
     }
 
     private static function envString(string $name): ?string

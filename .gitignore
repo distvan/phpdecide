@@ -1,2 +1,8 @@
 .phpunit.cache
 vendor
+
+# Local environment / secret material (do not commit)
+env.bash.sh
+docs/env.bash.sh
+.env
+.env.*
