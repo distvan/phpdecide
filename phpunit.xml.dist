@@ -12,10 +12,10 @@
         </testsuite>
     </testsuites>
 
-    <filter>
-        <whitelist>
-            <directory suffix=".php">src/</directory>
-        </whitelist>
-    </filter>
+    <source>
+        <include>
+            <directory>src/</directory>
+        </include>
+    </source>
 
 </phpunit>
