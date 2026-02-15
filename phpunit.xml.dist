@@ -11,4 +11,11 @@
             <directory>tests</directory>
         </testsuite>
     </testsuites>
+
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory>src/</directory>
+        </include>
+    </coverage>
+
 </phpunit>
