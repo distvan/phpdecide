@@ -1,12 +1,12 @@
 ![Status](https://sonarcloud.io/api/project_badges/quality_gate?project=distvan_phpdecide) \
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=coverage)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
-[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
-[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
-[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
-[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide) \
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=coverage)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
 ## PHPDecide
 
