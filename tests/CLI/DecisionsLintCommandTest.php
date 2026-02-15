@@ -13,11 +13,21 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class DecisionsLintCommandTest extends TestCase
 {
+    private const DECISION_TITLE_NO_ORMS = 'No ORMs';
+    private const DECISION_SUMMARY_USE_RAW_SQL = 'Use raw SQL';
+
     /** @var list<string> */
     private array $tempDirs = [];
 
+    private ?string $originalCwd = null;
+
     protected function tearDown(): void
     {
+        if ($this->originalCwd !== null) {
+            @chdir($this->originalCwd);
+            $this->originalCwd = null;
+        }
+
         foreach ($this->tempDirs as $dir) {
             if (is_dir($dir)) {
                 $this->removeDirRecursive($dir);
@@ -34,7 +44,7 @@ final class DecisionsLintCommandTest extends TestCase
 
         $this->writeFile(
             $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-no-orms.yaml',
-            $this->minimalDecisionYaml('DEC-0001', 'No ORMs', 'Use raw SQL')
+            $this->minimalDecisionYaml('DEC-0001', self::DECISION_TITLE_NO_ORMS, self::DECISION_SUMMARY_USE_RAW_SQL)
         );
 
         $tester = new CommandTester(new DecisionsLintCommand());
@@ -118,7 +128,7 @@ YAML
 
         $this->writeFile(
             $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001.yml',
-            $this->minimalDecisionYaml('DEC-0001', 'No ORMs', 'Use raw SQL')
+            $this->minimalDecisionYaml('DEC-0001', self::DECISION_TITLE_NO_ORMS, self::DECISION_SUMMARY_USE_RAW_SQL)
         );
 
         $tester = new CommandTester(new DecisionsLintCommand());
@@ -138,6 +148,120 @@ YAML
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertStringContainsString('No decision files found', $tester->getDisplay(true));
+    }
+
+    public function testFailsWhenNoDecisionFilesExistAndRequireAnyIsSet(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+
+        $tester = new CommandTester(new DecisionsLintCommand());
+        $exitCode = $tester->execute(['--dir' => $decisionsDir, '--require-any' => true]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('No decision files found', $tester->getDisplay(true));
+    }
+
+    public function testFailsWhenDecisionsDirectoryDoesNotExist(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $missingDir = $projectDir . DIRECTORY_SEPARATOR . 'does-not-exist';
+
+        $tester = new CommandTester(new DecisionsLintCommand());
+        $exitCode = $tester->execute(['--dir' => $missingDir]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('Decisions directory not found', $tester->getDisplay(true));
+    }
+
+    public function testFailsWhenDecisionFileParsesToScalarInsteadOfMapping(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-scalar.yaml',
+            "hello"
+        );
+
+        $tester = new CommandTester(new DecisionsLintCommand());
+        $exitCode = $tester->execute(['--dir' => $decisionsDir]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('decision file must parse to a YAML mapping/object', $tester->getDisplay(true));
+        self::assertStringContainsString('DEC-0001-scalar.yaml', $tester->getDisplay(true));
+    }
+
+    public function testFailsWhenStringListFieldsContainNonStringOrEmptyItems(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-invalid-lists.yaml',
+            <<<YAML
+id: DEC-0001
+title: Invalid lists
+status: active
+date: '2026-02-03'
+scope:
+  type: path
+  paths:
+    - src/*
+    - 123
+decision:
+  summary: Something
+  rationale:
+    - Because.
+    - ''
+  alternatives:
+    - 456
+examples:
+  allowed:
+    - ''
+rules:
+  allow:
+    - 1
+ai:
+  explain_style: short
+  keywords:
+    - 2
+YAML
+        );
+
+        $tester = new CommandTester(new DecisionsLintCommand());
+        $exitCode = $tester->execute(['--dir' => $decisionsDir]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        $display = $tester->getDisplay(true);
+        self::assertStringContainsString('Decision lint failed', $display);
+        self::assertStringContainsString('scope.paths[1] must be a non-empty string', $display);
+        self::assertStringContainsString('decision.rationale[1] must be a non-empty string', $display);
+        self::assertStringContainsString('decision.alternatives[0] must be a non-empty string', $display);
+        self::assertStringContainsString('rules.allow[0] must be a non-empty string', $display);
+        self::assertStringContainsString('ai.keywords[0] must be a non-empty string', $display);
+    }
+
+    public function testDefaultsToProjectDecisionsDirWhenDirOptionIsEmptyString(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-no-orms.yaml',
+            $this->minimalDecisionYaml('DEC-0001', self::DECISION_TITLE_NO_ORMS, self::DECISION_SUMMARY_USE_RAW_SQL)
+        );
+
+        $this->originalCwd = (string) getcwd();
+        if (!chdir($projectDir)) {
+            throw new TestFilesystemException("Unable to change cwd to: {$projectDir}");
+        }
+
+        $tester = new CommandTester(new DecisionsLintCommand());
+        $exitCode = $tester->execute(['--dir' => '']);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString('OK', $tester->getDisplay(true));
     }
 
     private function createTempProjectDir(): string
