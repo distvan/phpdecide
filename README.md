@@ -1,5 +1,5 @@
 ![Status](https://sonarcloud.io/api/project_badges/quality_gate?project=distvan_phpdecide)
-
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=distvan_phpdecide&metric=coverage)](https://sonarcloud.io/summary/new_code?id=distvan_phpdecide)
 ## PHPDecide
 
 A decision memory and enforcement for PHP projects. \
