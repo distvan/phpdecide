@@ -14,9 +14,12 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 ### Changed
 - AI requests explicitly set `stream=false` and send `Accept: application/json` for better compatibility with gateways.
+- AI HTTP transport is now abstracted behind an `HttpClient` interface (default implementation: `CurlHttpClient`).
+- AI environment configuration parsing/validation is now centralized in `AiClientConfig`.
 
 ### Fixed
 - AI error reporting now includes HTTP status, target URL, auth header diagnostics (without secrets), and a short response snippet when the gateway returns non-JSON bodies (common for 401/404 proxy errors).
+- Avoid deprecated `curl_close()` usage in the internal cURL HTTP client.
 
 ## [1.0.0] - 2026-02-15
 

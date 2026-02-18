@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace PhpDecide\AI;
 
+use PhpDecide\AI\Http\CurlHttpClient;
+use PhpDecide\AI\Http\HttpClient;
 use PhpDecide\Decision\Decision;
 use InvalidArgumentException;
 
 final class OpenAiChatCompletionsClient implements AiClient
 {
+    private readonly HttpClient $httpClient;
+
     public function __construct(
         private readonly string $apiKey,
         private readonly string $model,
@@ -22,7 +26,10 @@ final class OpenAiChatCompletionsClient implements AiClient
         private readonly ?string $systemPromptOverride = null,
         private readonly ?string $caInfoPath = null,
         private readonly bool $insecureSkipVerify = false,
+        ?HttpClient $httpClient = null,
     ) {
+        $this->httpClient = $httpClient ?? new CurlHttpClient();
+
         if (trim($this->apiKey) === '') {
             throw new InvalidArgumentException('OpenAI API key must be a non-empty string.');
         }
@@ -157,22 +164,26 @@ PROMPT;
      */
     private function postJson(string $url, array $payload): array
     {
-        self::assertCurlAvailable();
-
         $json = self::encodePayload($payload);
         $headers = $this->buildHeaders();
-        $ch = $this->initCurl($url, $headers, $json);
 
-        try {
-            $this->applyTlsOptions($ch);
-            [$raw, $status, $errno, $error] = $this->execCurl($ch);
-        } finally {
-            unset($ch);
+        if ($this->insecureSkipVerify) {
+            throw new AiClientException(
+                'Insecure TLS verification (PHPDECIDE_AI_INSECURE) is not supported. ' .
+                'Configure PHPDECIDE_AI_CAINFO / CURL_CA_BUNDLE or fix your system trust store instead.'
+            );
         }
 
-        if ($raw === false) {
-            throw new AiClientException(sprintf('AI request failed (%d): %s', $errno, $error));
-        }
+        $response = $this->httpClient->post(
+            url: $url,
+            headers: $headers,
+            body: $json,
+            timeoutSeconds: $this->timeoutSeconds,
+            caInfoPath: $this->caInfoPath,
+        );
+
+        $raw = $response->body;
+        $status = $response->statusCode;
 
         if ($status < 200 || $status >= 300) {
             $decoded = self::tryDecodeJson($raw);
@@ -214,13 +225,6 @@ PROMPT;
         $prefixSummary = $prefix === '' ? '[empty]' : $prefix;
 
         return sprintf('Auth header sent: %s (prefix: %s).', $name, $prefixSummary);
-    }
-
-    private static function assertCurlAvailable(): void
-    {
-        if (!function_exists('curl_init')) {
-            throw new AiClientException('cURL extension is required for AI support.');
-        }
     }
 
     /**
@@ -270,61 +274,6 @@ PROMPT;
         if (str_contains($value, "\r") || str_contains($value, "\n")) {
             throw new AiClientException($label . ' contains newline characters, which is not allowed.');
         }
-    }
-
-    /**
-     * @param list<string> $headers
-     * @return \CurlHandle
-     */
-    private function initCurl(string $url, array $headers, string $json): \CurlHandle
-    {
-        $ch = curl_init($url);
-        if ($ch === false) {
-            throw new AiClientException('Unable to initialize cURL.');
-        }
-
-        $connectTimeout = max(1, min(10, $this->timeoutSeconds));
-
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_POSTFIELDS => $json,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => $connectTimeout,
-            CURLOPT_TIMEOUT => $this->timeoutSeconds,
-        ]);
-
-        return $ch;
-    }
-
-    private function applyTlsOptions(\CurlHandle $ch): void
-    {
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-
-        if ($this->caInfoPath !== null && trim($this->caInfoPath) !== '') {
-            curl_setopt($ch, CURLOPT_CAINFO, $this->caInfoPath);
-        }
-
-        if ($this->insecureSkipVerify) {
-            throw new AiClientException(
-                'Insecure TLS verification (PHPDECIDE_AI_INSECURE) is not supported. ' .
-                'Configure PHPDECIDE_AI_CAINFO / CURL_CA_BUNDLE or fix your system trust store instead.'
-            );
-        }
-    }
-
-    /**
-     * @return array{0: string|false, 1: int, 2: int, 3: string}
-     */
-    private function execCurl(\CurlHandle $ch): array
-    {
-        $raw = curl_exec($ch);
-        $errno = curl_errno($ch);
-        $error = curl_error($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        return [$raw, $status, $errno, $error];
     }
 
     /**
