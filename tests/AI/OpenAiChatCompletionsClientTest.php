@@ -16,6 +16,8 @@ namespace PhpDecide\AI {
         public static int $nextErrno = 0;
         public static string $nextError = '';
 
+        public static ?string $lastUrl = null;
+
         /** @var array<int, mixed> */
         public static array $setopts = [];
 
@@ -28,13 +30,15 @@ namespace PhpDecide\AI {
             self::$nextStatus = 200;
             self::$nextErrno = 0;
             self::$nextError = '';
+            self::$lastUrl = null;
             self::$setopts = [];
             self::$setoptArray = [];
         }
     }
 
-    function curlInit(string $url): \CurlHandle|false
+    function curl_init(string $url): \CurlHandle|false  //NOSONAR
     {
+        CurlStub::$lastUrl = $url;
         return \curl_init($url);
     }
 
@@ -85,6 +89,8 @@ namespace PhpDecide\Tests\AI {
 
     final class OpenAiChatCompletionsClientTest extends TestCase
     {
+        private const TEST_BASE_URL = 'https://example.test';
+
         protected function setUp(): void
         {
             parent::setUp();
@@ -175,6 +181,98 @@ namespace PhpDecide\Tests\AI {
 
             // The constructor is expected to throw before explainDecision() runs.
             (new OpenAiChatCompletionsClient(apiKey: "k\n", model: 'm'))->explainDecision('Q?', []);
+        }
+
+        public function testChatCompletionsPathCanBeCustomized(): void
+        {
+            CurlStub::$nextRaw = json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR);
+            CurlStub::$nextStatus = 200;
+
+            $client = new OpenAiChatCompletionsClient(
+                apiKey: 'k',
+                model: 'm',
+                baseUrl: self::TEST_BASE_URL,
+                chatCompletionsPath: '/openai/v1/chat/completions'
+            );
+
+            $client->explainDecision('Q?', []);
+
+            self::assertSame('https://example.test/openai/v1/chat/completions', CurlStub::$lastUrl);
+        }
+
+        public function testModelIsOmittedWhenEmpty(): void
+        {
+            CurlStub::$nextRaw = json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR);
+            CurlStub::$nextStatus = 200;
+
+            $client = new OpenAiChatCompletionsClient(
+                apiKey: 'k',
+                model: '',
+                baseUrl: self::TEST_BASE_URL
+            );
+
+            $client->explainDecision('Q?', []);
+
+            $postFields = CurlStub::$setoptArray[CURLOPT_POSTFIELDS] ?? null;
+            self::assertIsString($postFields);
+
+            $decoded = json_decode($postFields, true, flags: JSON_THROW_ON_ERROR);
+            self::assertIsArray($decoded);
+            self::assertArrayNotHasKey('model', $decoded);
+        }
+
+        public function testCustomAuthHeaderNameAndPrefixAreApplied(): void
+        {
+            CurlStub::$nextRaw = json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR);
+            CurlStub::$nextStatus = 200;
+
+            $client = new OpenAiChatCompletionsClient(
+                apiKey: 'secret',
+                model: 'm',
+                baseUrl: self::TEST_BASE_URL,
+                authHeaderName: 'Api-Key',
+                authPrefix: ''
+            );
+
+            $client->explainDecision('Q?', []);
+
+            $headers = CurlStub::$setoptArray[CURLOPT_HTTPHEADER] ?? null;
+            self::assertIsArray($headers);
+            self::assertContains('Api-Key: secret', $headers);
+        }
+
+        public function testNonJsonHttpErrorIncludesAuthDiagnostics(): void
+        {
+            CurlStub::$nextRaw = 'Bad Authorization header';
+            CurlStub::$nextStatus = 401;
+
+            $client = new OpenAiChatCompletionsClient(
+                apiKey: 'secret',
+                model: 'm',
+                baseUrl: self::TEST_BASE_URL,
+                authHeaderName: 'Api-Key',
+                authPrefix: ''
+            );
+
+            $this->expectException(AiClientException::class);
+            $this->expectExceptionMessage('HTTP 401');
+            $this->expectExceptionMessage('Auth header sent: Api-Key');
+            $this->expectExceptionMessage('prefix: [empty]');
+            $this->expectExceptionMessage('Bad Authorization header');
+
+            $client->explainDecision('Q?', []);
         }
     }
 }

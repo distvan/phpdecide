@@ -13,6 +13,9 @@ final class OpenAiChatCompletionsClient implements AiClient
         private readonly string $apiKey,
         private readonly string $model,
         private readonly string $baseUrl = 'https://api.openai.com',
+        private readonly string $chatCompletionsPath = '/v1/chat/completions',
+        private readonly string $authHeaderName = 'Authorization',
+        private readonly string $authPrefix = 'Bearer ',
         private readonly int $timeoutSeconds = 20,
         private readonly ?string $organization = null,
         private readonly ?string $project = null,
@@ -26,8 +29,31 @@ final class OpenAiChatCompletionsClient implements AiClient
 
         self::assertHeaderValueSafe($this->apiKey, 'OpenAI API key');
 
+        // Some OpenAI-compatible gateways encode the model in the URL path.
+        // In that case, the request must omit the "model" field.
         if (trim($this->model) === '') {
-            throw new InvalidArgumentException('OpenAI model must be a non-empty string.');
+            // Allowed: treat as "model omitted".
+        }
+
+        if (trim($this->authHeaderName) === '') {
+            throw new InvalidArgumentException('Auth header name must be a non-empty string.');
+        }
+
+        $headerName = trim($this->authHeaderName);
+        if (!preg_match('/^[A-Za-z0-9-]+$/', $headerName)) {
+            throw new InvalidArgumentException('Auth header name contains invalid characters.');
+        }
+
+        // Header value safety
+        self::assertHeaderValueSafe($this->authPrefix, 'Auth header prefix');
+
+        if (trim($this->chatCompletionsPath) === '') {
+            throw new InvalidArgumentException('Chat completions path must be a non-empty string.');
+        }
+
+        $path = trim($this->chatCompletionsPath);
+        if (!str_starts_with($path, '/')) {
+            throw new InvalidArgumentException('Chat completions path must start with a slash (e.g. /v1/chat/completions).');
         }
 
         if ($this->organization !== null) {
@@ -85,15 +111,21 @@ final class OpenAiChatCompletionsClient implements AiClient
         $userContent .= "\n\nTask: Summarize ONLY what is recorded above. If something is missing, say it's not recorded.";
 
         $payload = [
-            'model' => $this->model,
             'temperature' => 0.2,
+            // Some gateways default to streaming; we only support non-streaming JSON responses.
+            'stream' => false,
             'messages' => [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $userContent],
             ],
         ];
 
-        $response = $this->postJson($this->baseUrl . '/v1/chat/completions', $payload);
+        $model = trim($this->model);
+        if ($model !== '') {
+            $payload['model'] = $model;
+        }
+
+        $response = $this->postJson($this->baseUrl . trim($this->chatCompletionsPath), $payload);
 
         $content = $response['choices'][0]['message']['content'] ?? null;
         if (!is_string($content) || trim($content) === '') {
@@ -142,10 +174,46 @@ PROMPT;
             throw new AiClientException(sprintf('AI request failed (%d): %s', $errno, $error));
         }
 
-        $decoded = self::decodeJson($raw);
-        $this->throwForHttpStatus($status, $decoded, $url);
+        if ($status < 200 || $status >= 300) {
+            $decoded = self::tryDecodeJson($raw);
+            if (is_array($decoded)) {
+                $this->throwForHttpStatus($status, $decoded, $url);
+            }
+
+            $snippet = self::formatResponseSnippet($raw);
+            $authDiag = $this->formatAuthDiagnostics();
+            throw new AiClientException(sprintf(
+                'AI request failed (HTTP %d). Response was not valid JSON for %s. %s Body starts with: %s',
+                $status,
+                $url,
+                $authDiag,
+                $snippet
+            ));
+        }
+
+        $decoded = self::tryDecodeJson($raw);
+        if (!is_array($decoded)) {
+            $snippet = self::formatResponseSnippet($raw);
+            $authDiag = $this->formatAuthDiagnostics();
+            throw new AiClientException(sprintf(
+                'AI response was not valid JSON (HTTP %d) from %s. %s Body starts with: %s',
+                $status,
+                $url,
+                $authDiag,
+                $snippet
+            ));
+        }
 
         return $decoded;
+    }
+
+    private function formatAuthDiagnostics(): string
+    {
+        $name = trim($this->authHeaderName);
+        $prefix = $this->authPrefix;
+        $prefixSummary = $prefix === '' ? '[empty]' : $prefix;
+
+        return sprintf('Auth header sent: %s (prefix: %s).', $name, $prefixSummary);
     }
 
     private static function assertCurlAvailable(): void
@@ -175,8 +243,13 @@ PROMPT;
     {
         $headers = [
             'Content-Type: application/json',
-            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
         ];
+
+        $authHeaderName = trim($this->authHeaderName);
+        $authValue = $this->authPrefix . $this->apiKey;
+        self::assertHeaderValueSafe($authValue, $authHeaderName);
+        $headers[] = $authHeaderName . ': ' . $authValue;
 
         if ($this->organization !== null && trim($this->organization) !== '') {
             $org = trim($this->organization);
@@ -255,16 +328,37 @@ PROMPT;
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null
      */
-    private static function decodeJson(string $raw): array
+    private static function tryDecodeJson(string $raw): ?array
     {
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            throw new AiClientException('AI response was not valid JSON.');
+        $decoded = json_decode(self::stripUtf8Bom($raw), true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private static function stripUtf8Bom(string $raw): string
+    {
+        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
+            return substr($raw, 3);
         }
 
-        return $decoded;
+        return $raw;
+    }
+
+    private static function formatResponseSnippet(string $raw): string
+    {
+        $s = trim(self::stripUtf8Bom($raw));
+        if ($s === '') {
+            return '[empty body]';
+        }
+
+        $s = preg_replace('/\s+/', ' ', $s) ?? $s;
+        $max = 300;
+        if (mb_strlen($s) > $max) {
+            $s = mb_substr($s, 0, $max) . '...';
+        }
+
+        return $s;
     }
 
     /**

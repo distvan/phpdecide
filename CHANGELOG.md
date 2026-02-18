@@ -4,6 +4,20 @@ All notable changes to **PHPDecide** will be documented in this file.
 
 This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - Unreleased
+
+### Added
+- AI gateway support improvements for OpenAI-compatible proxies (e.g. DIAL / Azure-style gateways):
+  - `PHPDECIDE_AI_CHAT_COMPLETIONS_PATH` to override the Chat Completions endpoint path (default: `/v1/chat/completions`).
+  - `PHPDECIDE_AI_OMIT_MODEL` to omit the JSON `model` field when the gateway encodes the model/deployment in the URL.
+  - `PHPDECIDE_AI_AUTH_HEADER_NAME` and `PHPDECIDE_AI_AUTH_PREFIX` to support non-Bearer authentication (e.g. `Api-Key: <key>`).
+
+### Changed
+- AI requests explicitly set `stream=false` and send `Accept: application/json` for better compatibility with gateways.
+
+### Fixed
+- AI error reporting now includes HTTP status, target URL, auth header diagnostics (without secrets), and a short response snippet when the gateway returns non-JSON bodies (common for 401/404 proxy errors).
+
 ## [1.0.0] - 2026-02-15
 
 ### Highlights
@@ -42,3 +56,4 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 - Decision loader reads `.yaml` files (not `.yml`).
 
 [1.0.0]: https://github.com/distvan/phpdecide/releases/tag/v1.0.0
+[1.1.0]: https://github.com/distvan/phpdecide/releases/tag/v1.1.0

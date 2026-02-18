@@ -17,10 +17,25 @@ final class AiClientFactory
 
         $model = self::envString('PHPDECIDE_AI_MODEL') ?? 'gpt-4o-mini';
 
+        if (self::envBool('PHPDECIDE_AI_OMIT_MODEL')) {
+            $model = '';
+        }
+
         $baseUrl = self::envString('PHPDECIDE_AI_BASE_URL') ?? 'https://api.openai.com';
         self::assertSafeBaseUrl($baseUrl);
 
+        $chatCompletionsPath = self::envString('PHPDECIDE_AI_CHAT_COMPLETIONS_PATH')
+            ?? '/v1/chat/completions';
+
         $timeoutSeconds = self::envPositiveInt('PHPDECIDE_AI_TIMEOUT') ?? 20;
+
+        $authHeaderName = self::envString('PHPDECIDE_AI_AUTH_HEADER_NAME') ?? 'Authorization';
+        $authPrefix = self::envStringAllowEmpty('PHPDECIDE_AI_AUTH_PREFIX');
+        if ($authPrefix === null) {
+            $authPrefix = 'Bearer ';
+        } elseif ($authPrefix !== '' && !str_ends_with($authPrefix, ' ')) {
+            $authPrefix .= ' ';
+        }
 
         $org = self::envString('PHPDECIDE_AI_ORG');
         $project = self::envString('PHPDECIDE_AI_PROJECT');
@@ -35,6 +50,9 @@ final class AiClientFactory
             apiKey: $apiKey,
             model: $model,
             baseUrl: rtrim($baseUrl, '/'),
+            chatCompletionsPath: $chatCompletionsPath,
+            authHeaderName: $authHeaderName,
+            authPrefix: $authPrefix,
             timeoutSeconds: $timeoutSeconds,
             organization: $org,
             project: $project,
@@ -89,6 +107,16 @@ final class AiClientFactory
 
         $trimmed = trim($value);
         return $trimmed !== '' ? $trimmed : null;
+    }
+
+    private static function envStringAllowEmpty(string $name): ?string
+    {
+        $value = getenv($name);
+        if (!is_string($value)) {
+            return null;
+        }
+
+        return $value;
     }
 
     private static function envPositiveInt(string $name): ?int

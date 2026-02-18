@@ -24,6 +24,9 @@ final class AiClientFactoryTest extends TestCase
             'PHPDECIDE_AI_API_KEY',
             'PHPDECIDE_AI_MODEL',
             'PHPDECIDE_AI_BASE_URL',
+            'PHPDECIDE_AI_CHAT_COMPLETIONS_PATH',
+            'PHPDECIDE_AI_AUTH_HEADER_NAME',
+            'PHPDECIDE_AI_AUTH_PREFIX',
             'PHPDECIDE_AI_TIMEOUT',
             'PHPDECIDE_AI_ORG',
             'PHPDECIDE_AI_PROJECT',
@@ -31,6 +34,7 @@ final class AiClientFactoryTest extends TestCase
             'PHPDECIDE_AI_CAINFO',
             'CURL_CA_BUNDLE',
             'PHPDECIDE_AI_INSECURE',
+            'PHPDECIDE_AI_OMIT_MODEL',
         ]);
     }
 
@@ -96,6 +100,29 @@ final class AiClientFactoryTest extends TestCase
 
         self::assertSame('C:\\tmp\\cacert.pem', $this->readPrivatePropertyString($client, 'caInfoPath'));
         self::assertTrue($this->readPrivatePropertyBool($client, 'insecureSkipVerify'));
+    }
+
+    public function testFromEnvironmentCanOmitModel(): void
+    {
+        putenv(self::API_KEY_ENV);
+        putenv('PHPDECIDE_AI_OMIT_MODEL=true');
+
+        $client = AiClientFactory::fromEnvironment();
+        self::assertInstanceOf(OpenAiChatCompletionsClient::class, $client);
+
+        self::assertSame('', $this->readPrivatePropertyString($client, 'model'));
+    }
+
+    public function testFromEnvironmentNormalizesBearerPrefixWithSpace(): void
+    {
+        putenv(self::API_KEY_ENV);
+        putenv('PHPDECIDE_AI_AUTH_HEADER_NAME=Authorization');
+        putenv('PHPDECIDE_AI_AUTH_PREFIX=Bearer');
+
+        $client = AiClientFactory::fromEnvironment();
+        self::assertInstanceOf(OpenAiChatCompletionsClient::class, $client);
+
+        self::assertSame('Bearer ', $this->readPrivatePropertyString($client, 'authPrefix'));
     }
 
     /** @param list<string> $names */

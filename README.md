@@ -138,4 +138,32 @@ PHPDecide is ideal for:
 
 Tip: use [docs/decision-file-anatomy.md](docs/decision-file-anatomy.md) as the schema guide.
 
-AI note: if you enable `--ai` and hit TLS/certificate issues, configure `PHPDECIDE_AI_CAINFO` (CA bundle). TLS verification is enforced; there is no insecure/skip-verify mode.
+### AI configuration (optional)
+
+AI mode is off by default and only activates when you pass `--ai`.
+
+Environment variables:
+
+- `PHPDECIDE_AI_API_KEY` (required)
+- `PHPDECIDE_AI_MODEL` (optional, default: `gpt-4o-mini`)
+- `PHPDECIDE_AI_OMIT_MODEL` (optional, default: `false`) - set to `true` if your gateway encodes the model in the URL path and rejects a `model` field in JSON (common in some DIAL deployments)
+- `PHPDECIDE_AI_BASE_URL` (optional, default: `https://api.openai.com`)
+- `PHPDECIDE_AI_CHAT_COMPLETIONS_PATH` (optional, default: `/v1/chat/completions`) - override if your gateway uses a different OpenAI-compatible path
+- `PHPDECIDE_AI_TIMEOUT` (optional, seconds)
+- `PHPDECIDE_AI_AUTH_HEADER_NAME` (optional, default: `Authorization`) - header name used for authentication (some gateways require `api-key`)
+- `PHPDECIDE_AI_AUTH_PREFIX` (optional, default: `Bearer `) - prefix placed before the API key in the auth header value (set to empty for `api-key: <key>` style)
+- `PHPDECIDE_AI_ORG`, `PHPDECIDE_AI_PROJECT` (optional) - extra headers for some OpenAI-compatible providers
+- `PHPDECIDE_AI_SYSTEM_PROMPT` (optional) - override the system prompt
+- `PHPDECIDE_AI_CAINFO` (optional) - path to a CA bundle (`cacert.pem`) if you get cURL SSL errors (e.g. cURL error 60)
+
+TLS note: if you enable `--ai` and hit TLS/certificate issues, configure `PHPDECIDE_AI_CAINFO` (CA bundle). TLS verification is enforced; there is no insecure/skip-verify mode.
+
+Gateway / DIAL note: if your gateway puts the model into the URL (instead of JSON), set `PHPDECIDE_AI_CHAT_COMPLETIONS_PATH` accordingly and enable `PHPDECIDE_AI_OMIT_MODEL=true`.
+
+Example (DIAL / Azure-style OpenAI proxy):
+
+- `PHPDECIDE_AI_BASE_URL=https://ai-proxy.example.com`
+- `PHPDECIDE_AI_CHAT_COMPLETIONS_PATH=/openai/deployments/<deployment>/chat/completions`
+- `PHPDECIDE_AI_OMIT_MODEL=true`
+- `PHPDECIDE_AI_AUTH_HEADER_NAME=Api-Key`
+- `PHPDECIDE_AI_AUTH_PREFIX=`
