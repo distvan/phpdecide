@@ -141,7 +141,7 @@ package PhpDecide::Decision {
   }
 
   class DecisionFactory {
-    +fromArray(data: array): Decision
+    {static} +fromArray(data: array): Decision
   }
 }
 
@@ -151,8 +151,27 @@ package PhpDecide::AI {
     +explainDecision(question: string, decisions: array): string
   }
 
+  class AiClientConfig {
+    +__construct(
+      apiKey: string,
+      model: string,
+      baseUrl: string,
+      chatCompletionsPath: string,
+      timeoutSeconds: int,
+      authHeaderName: string,
+      authPrefix: string,
+      organization: string?,
+      project: string?,
+      systemPromptOverride: string?,
+      caInfoPath: string?,
+      insecureSkipVerify: bool
+    )
+    {static} +fromEnvironment(): AiClientConfig?
+  }
+
   class AiClientFactory {
-    {static} +fromEnvironment(): AiClient?
+    {static} +fromEnvironment(httpClient: PhpDecide::AI::Http::HttpClient? = null): AiClient?
+    {static} +fromConfig(config: AiClientConfig, httpClient: PhpDecide::AI::Http::HttpClient? = null): AiClient
   }
 
   class OpenAiChatCompletionsClient {
@@ -160,15 +179,35 @@ package PhpDecide::AI {
       apiKey: string,
       model: string,
       baseUrl: string = "https://api.openai.com",
+      chatCompletionsPath: string = "/v1/chat/completions",
+      authHeaderName: string = "Authorization",
+      authPrefix: string = "Bearer ",
       timeoutSeconds: int = 20,
       organization: string? = null,
       project: string? = null,
-      systemPromptOverride: string? = null
+      systemPromptOverride: string? = null,
+      caInfoPath: string? = null,
+      insecureSkipVerify: bool = false,
+      httpClient: PhpDecide::AI::Http::HttpClient? = null
     )
     +explainDecision(question: string, decisions: array): string
   }
 
   class AiClientException
+}
+
+package PhpDecide::AI::Http {
+  interface HttpClient {
+    +post(url: string, headers: array, body: string, timeoutSeconds: int, caInfoPath: string? = null): HttpResponse
+  }
+
+  class HttpResponse {
+    +__construct(statusCode: int, body: string)
+  }
+
+  class CurlHttpClient {
+    +post(url: string, headers: array, body: string, timeoutSeconds: int, caInfoPath: string? = null): HttpResponse
+  }
 }
 
 package PhpDecide::Explain {
@@ -228,6 +267,7 @@ YamlDecisionLoader ..|> DecisionLoader
 FileDecisionRepository ..|> DecisionRepository
 OpenAiChatCompletionsClient ..|> PhpDecide::AI::AiClient
 AiClientExplainer ..|> PhpDecide::Explain::AiExplainer
+CurlHttpClient ..|> PhpDecide::AI::Http::HttpClient
 
 ' --- Inheritance ---
 PhpDecide::CLI::ExplainCommand --|> Symfony::Console::Command
@@ -238,6 +278,11 @@ FileDecisionRepository ..> DecisionLoader
 FileDecisionRepository ..> Decision
 FileDecisionRepository ..> DecisionId
 DecisionFactory ..> Decision
+AiClientFactory ..> AiClientConfig
+AiClientFactory ..> PhpDecide::AI::Http::HttpClient
+AiClientFactory ..> OpenAiChatCompletionsClient
+OpenAiChatCompletionsClient o-- "1" PhpDecide::AI::Http::HttpClient : httpClient
+CurlHttpClient ..> PhpDecide::AI::Http::HttpResponse
 DecisionFactory ..> DecisionId
 DecisionFactory ..> DecisionStatus
 DecisionFactory ..> Scope
