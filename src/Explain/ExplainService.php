@@ -12,7 +12,7 @@ final class ExplainService
     private DecisionMatcher $matcher;
 
     public function __construct(
-        DecisionRepository $repository,
+        private readonly DecisionRepository $repository,
         private readonly ?AiExplainer $aiExplainer = null
     ) {
         $this->matcher = new DecisionMatcher($repository);
@@ -27,14 +27,11 @@ final class ExplainService
      */
     public function explain(string $question, ?string $path = null): Explanation
     {
-        $decisions = $this->matcher->match($question);
+        $candidates = (!empty($path))
+            ? $this->repository->applicableTo($path)
+            : null;
 
-        if (!empty($path)) {
-            $decisions = array_values(array_filter(
-                $decisions,
-                fn(Decision $decision): bool => $decision->scope()->appliesTo($path)
-            ));
-        }
+        $decisions = $this->matcher->match($question, $candidates);
 
         if (empty($decisions)) {
             return new Explanation([], 'No recorded decision covers this topic.');

@@ -6,6 +6,7 @@ namespace PhpDecide\Explain;
 
 use PhpDecide\Decision\Decision;
 use PhpDecide\Decision\DecisionRepository;
+use PhpDecide\Decision\SearchIndexedDecisionRepository;
 
 final class DecisionMatcher
 {
@@ -19,7 +20,7 @@ final class DecisionMatcher
     /**
      * @return Decision[]
      */
-    public function match(string $question): array
+    public function match(string $question, ?iterable $decisions = null): array
     {
         $tokens = $this->tokenize($question);
         
@@ -27,8 +28,10 @@ final class DecisionMatcher
             return [];
         }
 
+        $decisions ??= $this->repository->active();
+
         $matches = [];
-        foreach ($this->repository->active() as $decision) {
+        foreach ($decisions as $decision) {
             if ($this->matchesDecision($decision, $tokens)) {
                 $matches[] = $decision;
             }
@@ -39,13 +42,17 @@ final class DecisionMatcher
 
     private function matchesDecision(Decision $decision, array $tokens): bool
     {
-        $id = $decision->id()->value();
-        $haystack = $this->haystackLowerByDecisionId[$id] ??= mb_strtolower(implode(' ', [
-            $decision->title(),
-            $decision->content()->summary(),
-            implode(' ', $decision->content()->rationale()),
-            implode(' ', $decision->aiMetadata()?->keywords() ?? []),
-        ]));
+        if ($this->repository instanceof SearchIndexedDecisionRepository) {
+            $haystack = $this->repository->haystackLowerFor($decision);
+        } else {
+            $id = $decision->id()->value();
+            $haystack = $this->haystackLowerByDecisionId[$id] ??= mb_strtolower(implode(' ', [
+                $decision->title(),
+                $decision->content()->summary(),
+                implode(' ', $decision->content()->rationale()),
+                implode(' ', $decision->aiMetadata()?->keywords() ?? []),
+            ]));
+        }
 
         foreach ($tokens as $token) {
             if (str_contains($haystack, $token)) {

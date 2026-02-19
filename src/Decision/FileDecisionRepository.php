@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace PhpDecide\Decision;
 
-
-final class FileDecisionRepository implements DecisionRepository
+final class FileDecisionRepository implements DecisionRepository, SearchIndexedDecisionRepository
 {
     /** @var array<string, Decision> */
     private readonly array $decisionsById;
@@ -93,10 +92,15 @@ final class FileDecisionRepository implements DecisionRepository
 
     private function matchesKeyword(Decision $decision, string $keyword): bool
     {
-        $id = $decision->id()->value();
-        $haystackLower = $this->searchIndexLowerById[$id] ?? $this->buildSearchHaystackLower($decision);
+        $haystackLower = $this->haystackLowerFor($decision);
 
         return str_contains($haystackLower, $keyword);
+    }
+
+    public function haystackLowerFor(Decision $decision): string
+    {
+        $id = $decision->id()->value();
+        return $this->searchIndexLowerById[$id] ?? $this->buildSearchHaystackLower($decision);
     }
 
     private function buildSearchHaystackLower(Decision $decision): string

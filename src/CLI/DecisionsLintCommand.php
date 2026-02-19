@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PhpDecide\CLI;
 
-use DirectoryIterator;
 use PhpDecide\Config\PhpDecideDefaults;
 use PhpDecide\Decision\DecisionFactory;
+use PhpDecide\Decision\DecisionFileCollector;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -98,29 +98,16 @@ final class DecisionsLintCommand extends Command
      */
     private function collectDecisionFiles(string $dir): array
     {
-        $yamlFiles = [];
+        $files = DecisionFileCollector::collect($dir);
+        $yamlFiles = $files['yamlFiles'];
         $errors = [];
 
-        foreach (new DirectoryIterator($dir) as $fileInfo) {
-            if (!$fileInfo->isFile() || $fileInfo->isLink()) {
-                continue;
-            }
-
-            $ext = strtolower($fileInfo->getExtension());
-            if ($ext === 'yml') {
-                $errors[] = sprintf(
-                    'Unsupported extension ".yml" (loader only reads ".yaml"): %s',
-                    $fileInfo->getFilename()
-                );
-                continue;
-            }
-
-            if ($ext === 'yaml') {
-                $yamlFiles[] = $fileInfo->getPathname();
-            }
+        foreach ($files['ymlFiles'] as $ymlFile) {
+            $errors[] = sprintf(
+                'Unsupported extension ".yml" (loader only reads ".yaml"): %s',
+                basename($ymlFile)
+            );
         }
-
-        sort($yamlFiles, SORT_STRING);
 
         return [$yamlFiles, $errors];
     }

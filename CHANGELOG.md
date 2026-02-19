@@ -11,11 +11,18 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
   - `PHPDECIDE_AI_CHAT_COMPLETIONS_PATH` to override the Chat Completions endpoint path (default: `/v1/chat/completions`).
   - `PHPDECIDE_AI_OMIT_MODEL` to omit the JSON `model` field when the gateway encodes the model/deployment in the URL.
   - `PHPDECIDE_AI_AUTH_HEADER_NAME` and `PHPDECIDE_AI_AUTH_PREFIX` to support non-Bearer authentication (e.g. `Api-Key: <key>`).
+- Decision loading cache for `.decisions/*.yaml` to speed up repeated runs when files are unchanged.
+  - New CLI flag: `explain --no-cache`.
+  - New env var: `PHPDECIDE_DECISIONS_CACHE=0`.
 
 ### Changed
 - AI requests explicitly set `stream=false` and send `Accept: application/json` for better compatibility with gateways.
 - AI HTTP transport is now abstracted behind an `HttpClient` interface (default implementation: `CurlHttpClient`).
 - AI environment configuration parsing/validation is now centralized in `AiClientConfig`.
+- Explain scope filtering now narrows candidate decisions before keyword matching for better performance.
+- Decision file scanning is centralized in a shared collector to avoid duplicated directory iteration/sorting.
+- Decision matching reuses the repository’s precomputed search index when available to avoid rebuilding haystacks.
+- AI prompt payload is compacted (no pretty JSON, fewer fields) to reduce tokens/cost.
 
 ### Fixed
 - AI error reporting now includes HTTP status, target URL, auth header diagnostics (without secrets), and a short response snippet when the gateway returns non-JSON bodies (common for 401/404 proxy errors).

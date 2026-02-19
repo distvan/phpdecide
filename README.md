@@ -138,6 +138,15 @@ PHPDecide is ideal for:
 
 Tip: use [docs/decision-file-anatomy.md](docs/decision-file-anatomy.md) as the schema guide.
 
+### Decision loading cache (optional)
+
+By default, `explain` caches parsed decisions in `.decisions/.phpdecide-decisions.cache` to speed up repeated runs.
+
+Disable cache if you are debugging loader behavior:
+
+- CLI: `php ./bin/phpdecide explain "Why no ORMs?" --no-cache`
+- Env: set `PHPDECIDE_DECISIONS_CACHE=0`
+
 ### AI configuration (optional)
 
 AI mode is off by default and only activates when you pass `--ai`.

@@ -61,6 +61,37 @@ final class YamlDecisionLoaderTest extends TestCase
         iterator_to_array($loader->load(), false);
     }
 
+    public function testLoadUsesCacheWhenSignatureIsUnchanged(): void
+    {
+        $dir = $this->createTempDir();
+        $file = $dir . DIRECTORY_SEPARATOR . 'DEC-0001.yaml';
+
+        $yaml = $this->validDecisionYaml('DEC-0001', 'First decision');
+        file_put_contents($file, $yaml);
+
+        $mtime = filemtime($file);
+        self::assertIsInt($mtime);
+
+        $loader = new YamlDecisionLoader($dir);
+        $first = iterator_to_array($loader->load(), false);
+
+        self::assertCount(1, $first);
+        self::assertSame('DEC-0001', $first[0]->id()->value());
+
+        // Corrupt the YAML file but keep (mtime, size) unchanged so the cache signature matches.
+        $bad = str_repeat('x', strlen($yaml));
+        self::assertSame(strlen($yaml), strlen($bad));
+        file_put_contents($file, $bad);
+        touch($file, $mtime);
+
+        $loader2 = new YamlDecisionLoader($dir);
+        $second = iterator_to_array($loader2->load(), false);
+
+        // If the loader parsed YAML again, it would throw. Success here implies the cache was used.
+        self::assertCount(1, $second);
+        self::assertSame('DEC-0001', $second[0]->id()->value());
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->tempDirs as $dir) {

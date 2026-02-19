@@ -80,41 +80,12 @@ final class OpenAiChatCompletionsClient implements AiClient
         $systemPrompt = $this->systemPromptOverride ?? $this->defaultSystemPrompt();
 
         $decisionPayload = array_map(
-            static fn(Decision $d): array => [
-                'id' => $d->id()->value(),
-                'title' => $d->title(),
-                'status' => $d->status()->value,
-                'date' => $d->date()->format('Y-m-d'),
-                'scope' => [
-                    'type' => $d->scope()->type()->value,
-                    'paths' => $d->scope()->paths(),
-                ],
-                'summary' => $d->content()->summary(),
-                'rationale' => $d->content()->rationale(),
-                'alternatives' => $d->content()->alternatives(),
-                'examples' => [
-                    'allowed' => $d->examples()->allowed(),
-                    'forbidden' => $d->examples()->forbidden(),
-                ],
-                'rules' => $d->rules() ? [
-                    'forbid' => $d->rules()->forbid(),
-                    'allow' => $d->rules()->allow(),
-                ] : null,
-                'references' => $d->references() ? [
-                    'issues' => $d->references()->issues(),
-                    'commits' => $d->references()->commits(),
-                    'adr' => $d->references()->adr(),
-                ] : null,
-                'ai' => $d->aiMetadata() ? [
-                    'explain_style' => $d->aiMetadata()->explainStyle(),
-                    'keywords' => $d->aiMetadata()->keywords(),
-                ] : null,
-            ],
+            static fn(Decision $d): array => self::decisionToCompactPayload($d),
             $decisions
         );
 
         $userContent = "Question:\n{$question}\n\nRecorded decisions (authoritative source of truth):\n";
-        $userContent .= json_encode($decisionPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '[]';
+        $userContent .= json_encode($decisionPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]';
         $userContent .= "\n\nTask: Summarize ONLY what is recorded above. If something is missing, say it's not recorded.";
 
         $payload = [
@@ -232,12 +203,48 @@ PROMPT;
      */
     private static function encodePayload(array $payload): string
     {
-        $json = json_encode($payload);
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($json === false) {
             throw new AiClientException('Unable to encode AI request JSON.');
         }
 
         return $json;
+    }
+
+    /**
+     * Keep the AI prompt payload compact: only include the fields needed to explain decisions.
+     *
+     * @return array<string, mixed>
+     */
+    private static function decisionToCompactPayload(Decision $decision): array
+    {
+        $scope = [
+            'type' => $decision->scope()->type()->value,
+        ];
+
+        $paths = $decision->scope()->paths();
+        if ($paths !== []) {
+            $scope['paths'] = $paths;
+        }
+
+        $payload = [
+            'id' => $decision->id()->value(),
+            'title' => $decision->title(),
+            'date' => $decision->date()->format('Y-m-d'),
+            'scope' => $scope,
+            'summary' => $decision->content()->summary(),
+            'rationale' => $decision->content()->rationale(),
+        ];
+
+        $rules = $decision->rules();
+        if ($rules !== null && $rules->hasRules()) {
+            $payload['rules'] = [
+                'forbid' => $rules->forbid(),
+                'allow' => $rules->allow(),
+            ];
+        }
+
+        return $payload;
     }
 
     /**
