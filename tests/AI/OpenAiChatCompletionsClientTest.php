@@ -8,6 +8,8 @@ use PhpDecide\AI\AiClientException;
 use PhpDecide\AI\Http\HttpClient;
 use PhpDecide\AI\Http\HttpResponse;
 use PhpDecide\AI\OpenAiChatCompletionsClient;
+use PhpDecide\Decision\Decision;
+use PhpDecide\Decision\DecisionFactory;
 use PHPUnit\Framework\TestCase;
 
 final class OpenAiChatCompletionsClientTest extends TestCase
@@ -192,6 +194,215 @@ final class OpenAiChatCompletionsClientTest extends TestCase
         $this->expectExceptionMessage('Bad Authorization header');
 
         $client->explainDecision('Q?', []);
+    }
+
+    public function testOrganizationAndProjectHeadersAreAddedWhenProvided(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        $client = new OpenAiChatCompletionsClient(
+            apiKey: 'k',
+            model: 'm',
+            organization: 'org_123',
+            project: 'proj_456',
+            httpClient: $http,
+        );
+
+        $client->explainDecision('Q?', []);
+
+        self::assertIsArray($http->lastHeaders);
+        self::assertContains('OpenAI-Organization: org_123', $http->lastHeaders);
+        self::assertContains('OpenAI-Project: proj_456', $http->lastHeaders);
+    }
+
+    public function testSystemPromptOverrideIsUsed(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        $client = new OpenAiChatCompletionsClient(
+            apiKey: 'k',
+            model: 'm',
+            systemPromptOverride: 'SYSTEM OVERRIDE',
+            httpClient: $http,
+        );
+
+        $client->explainDecision('Q?', []);
+
+        self::assertIsString($http->lastBody);
+        $decoded = json_decode($http->lastBody, true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($decoded);
+        self::assertIsArray($decoded['messages']);
+        self::assertSame('system', $decoded['messages'][0]['role']);
+        self::assertSame('SYSTEM OVERRIDE', $decoded['messages'][0]['content']);
+    }
+
+    public function testUtf8BomIsStrippedFromJsonResponse(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: "\xEF\xBB\xBF" . json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        $client = new OpenAiChatCompletionsClient(apiKey: 'k', model: 'm', httpClient: $http);
+        self::assertSame('ok', $client->explainDecision('Q?', []));
+    }
+
+    public function testThrowsWhenMessageContentMissing(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: json_encode([
+                'choices' => [
+                    ['message' => []],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        $client = new OpenAiChatCompletionsClient(apiKey: 'k', model: 'm', httpClient: $http);
+
+        $this->expectException(AiClientException::class);
+        $this->expectExceptionMessage('missing message content');
+        $client->explainDecision('Q?', []);
+    }
+
+    public function testSendsCompactDecisionPayloadInUserMessage(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        $decisionWithoutRulesOrPaths = $this->makeDecision(
+            id: 'DEC-0001',
+            scopeType: 'global',
+            scopePaths: [],
+            rules: null,
+        );
+
+        $decisionWithRulesAndPaths = $this->makeDecision(
+            id: 'DEC-0002',
+            scopeType: 'path',
+            scopePaths: ['src/'],
+            rules: ['allow' => ['use-psr-4'], 'forbid' => ['do-evil']],
+        );
+
+        $client = new OpenAiChatCompletionsClient(apiKey: 'k', model: 'm', httpClient: $http);
+        $client->explainDecision('What is decided?', [$decisionWithoutRulesOrPaths, $decisionWithRulesAndPaths]);
+
+        self::assertIsString($http->lastBody);
+        $decoded = json_decode($http->lastBody, true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($decoded);
+
+        self::assertSame(0.2, $decoded['temperature']);
+        self::assertFalse($decoded['stream']);
+
+        $userContent = $decoded['messages'][1]['content'] ?? null;
+        self::assertIsString($userContent);
+
+        $json = $this->extractDecisionJsonFromUserMessage($userContent);
+        $payload = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($payload);
+        self::assertCount(2, $payload);
+
+        self::assertSame('DEC-0001', $payload[0]['id']);
+        self::assertArrayHasKey('scope', $payload[0]);
+        self::assertSame('global', $payload[0]['scope']['type']);
+        self::assertArrayNotHasKey('paths', $payload[0]['scope']);
+        self::assertArrayNotHasKey('rules', $payload[0]);
+
+        self::assertSame('DEC-0002', $payload[1]['id']);
+        self::assertSame('path', $payload[1]['scope']['type']);
+        self::assertSame(['src/'], $payload[1]['scope']['paths']);
+        self::assertSame(['do-evil'], $payload[1]['rules']['forbid']);
+        self::assertSame(['use-psr-4'], $payload[1]['rules']['allow']);
+    }
+
+    public function testCaInfoPathIsForwardedToHttpClient(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        $client = new OpenAiChatCompletionsClient(
+            apiKey: 'k',
+            model: 'm',
+            caInfoPath: 'C:\\tmp\\cacert.pem',
+            httpClient: $http,
+        );
+
+        $client->explainDecision('Q?', []);
+
+        self::assertSame('C:\\tmp\\cacert.pem', $http->lastCaInfoPath);
+    }
+
+    private function makeDecision(
+        string $id,
+        string $scopeType,
+        array $scopePaths,
+        ?array $rules,
+    ): Decision {
+        $data = [
+            'id' => $id,
+            'title' => 'Title ' . $id,
+            'status' => 'active',
+            'date' => '2026-01-01',
+            'scope' => [
+                'type' => $scopeType,
+                'paths' => $scopePaths,
+            ],
+            'decision' => [
+                'summary' => 'Summary ' . $id,
+                'rationale' => ['Because.'],
+            ],
+        ];
+
+        if ($rules !== null) {
+            $data['rules'] = $rules;
+        }
+
+        return DecisionFactory::fromArray($data);
+    }
+
+    private function extractDecisionJsonFromUserMessage(string $userContent): string
+    {
+        $markerStart = "Recorded decisions (authoritative source of truth):\n";
+        $markerEnd = "\n\nTask:";
+
+        $start = strpos($userContent, $markerStart);
+        self::assertNotFalse($start);
+        $start += strlen($markerStart);
+
+        $end = strpos($userContent, $markerEnd, $start);
+        self::assertNotFalse($end);
+
+        return substr($userContent, $start, $end - $start);
     }
 }
 
