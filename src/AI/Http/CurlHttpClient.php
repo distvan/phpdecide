@@ -40,7 +40,8 @@ final class CurlHttpClient implements HttpClient
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
-        if ($caInfoPath !== null && trim($caInfoPath) !== '') {
+        $caInfoPath = trim((string) $caInfoPath);
+        if ($caInfoPath !== '') {
             curl_setopt($ch, CURLOPT_CAINFO, $caInfoPath);
         }
 
