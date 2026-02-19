@@ -185,7 +185,7 @@ final class YamlDecisionLoader implements DecisionLoader
 
         $dir = dirname($this->cacheFile);
         if (!is_dir($dir)) {
-            $this->safeMkdir($dir, 0777, true);
+            $this->safeMkdir($dir, 0700, true);
         }
 
         // Best-effort; cache must never break normal behavior.
@@ -251,7 +251,7 @@ final class YamlDecisionLoader implements DecisionLoader
     private function safeWriteFile(string $path, string $content): bool
     {
         $dir = dirname($path);
-        if (!is_dir($dir) && !$this->safeMkdir($dir, 0777, true)) {
+        if (!is_dir($dir) && !$this->safeMkdir($dir, 0700, true)) {
             return false;
         }
 

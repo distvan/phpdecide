@@ -128,6 +128,30 @@ final class OpenAiChatCompletionsClientTest extends TestCase
         self::assertSame('https://example.test/openai/v1/chat/completions', $http->lastUrl);
     }
 
+    public function testBaseUrlTrailingSlashDoesNotProduceDoubleSlash(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        $client = new OpenAiChatCompletionsClient(
+            apiKey: 'k',
+            model: 'm',
+            baseUrl: 'https://example.test/',
+            chatCompletionsPath: '/v1/chat/completions',
+            httpClient: $http,
+        );
+
+        $client->explainDecision('Q?', []);
+
+        self::assertSame('https://example.test/v1/chat/completions', $http->lastUrl);
+    }
+
     public function testModelIsOmittedWhenEmpty(): void
     {
         $http = new FakeHttpClient(new HttpResponse(
@@ -360,6 +384,43 @@ final class OpenAiChatCompletionsClientTest extends TestCase
         $client->explainDecision('Q?', []);
 
         self::assertSame('C:\\tmp\\cacert.pem', $http->lastCaInfoPath);
+    }
+
+    public function testThrowsWhenDecisionPayloadCannotBeEncoded(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(
+            statusCode: 200,
+            body: json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'ok']],
+                ],
+            ], JSON_THROW_ON_ERROR)
+        ));
+
+        // Single-byte 0xB1 is invalid UTF-8 and should make json_encode() fail.
+        $badTitle = "Bad\xB1Title";
+
+        // Build a decision with invalid UTF-8 in the title.
+        $badDecision = DecisionFactory::fromArray([
+            'id' => 'DEC-0099',
+            'title' => $badTitle,
+            'status' => 'active',
+            'date' => '2026-01-01',
+            'scope' => ['type' => 'global', 'paths' => []],
+            'decision' => ['summary' => 'Summary', 'rationale' => ['Because.']],
+        ]);
+
+        $client = new OpenAiChatCompletionsClient(apiKey: 'k', model: 'm', httpClient: $http);
+
+        $this->expectException(AiClientException::class);
+        $this->expectExceptionMessage('Unable to encode AI request JSON');
+
+        try {
+            $client->explainDecision('Q?', [$badDecision]);
+        } finally {
+            // Ensure we fail fast before any HTTP call is attempted.
+            self::assertNull($http->lastUrl);
+        }
     }
 
     private function makeDecision(

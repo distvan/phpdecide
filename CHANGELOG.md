@@ -27,6 +27,9 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 ### Fixed
 - AI error reporting now includes HTTP status, target URL, auth header diagnostics (without secrets), and a short response snippet when the gateway returns non-JSON bodies (common for 401/404 proxy errors).
 - Avoid deprecated `curl_close()` usage in the internal cURL HTTP client.
+- OpenAI Chat Completions URL construction now normalizes `baseUrl` + `chatCompletionsPath` to avoid double slashes (`//`) when callers provide a trailing slash.
+- AI prompt construction now fails fast when the embedded decisions payload cannot be JSON-encoded (e.g. invalid UTF-8), instead of silently sending an empty decisions list.
+- Decision cache directory creation uses a more restrictive default permission mode (`0700`) instead of `0777`.
 
 ## [1.0.0] - 2026-02-15
 

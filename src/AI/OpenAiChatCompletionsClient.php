@@ -85,7 +85,7 @@ final class OpenAiChatCompletionsClient implements AiClient
         );
 
         $userContent = "Question:\n{$question}\n\nRecorded decisions (authoritative source of truth):\n";
-        $userContent .= json_encode($decisionPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]';
+        $userContent .= self::encodePayload($decisionPayload);
         $userContent .= "\n\nTask: Summarize ONLY what is recorded above. If something is missing, say it's not recorded.";
 
         $payload = [
@@ -103,7 +103,9 @@ final class OpenAiChatCompletionsClient implements AiClient
             $payload['model'] = $model;
         }
 
-        $response = $this->postJson($this->baseUrl . trim($this->chatCompletionsPath), $payload);
+        $baseUrl = rtrim(trim($this->baseUrl), '/');
+        $endpointPath = '/' . ltrim(trim($this->chatCompletionsPath), '/');
+        $response = $this->postJson($baseUrl . $endpointPath, $payload);
 
         $content = $response['choices'][0]['message']['content'] ?? null;
         if (!is_string($content) || trim($content) === '') {
@@ -199,7 +201,7 @@ PROMPT;
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param array<mixed> $payload
      */
     private static function encodePayload(array $payload): string
     {
