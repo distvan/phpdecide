@@ -4,7 +4,7 @@ All notable changes to **PHPDecide** will be documented in this file.
 
 This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - Unreleased
+## [1.1.0] - 2026-02-21
 
 ### Added
 - AI gateway support improvements for OpenAI-compatible proxies (e.g. DIAL / Azure-style gateways):
