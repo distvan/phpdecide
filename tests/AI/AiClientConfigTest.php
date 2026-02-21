@@ -18,7 +18,7 @@ final class AiClientConfigTest extends TestCase
     {
         parent::setUp();
 
-        $this->snapshotEnv([
+        $names = [
             'PHPDECIDE_AI_API_KEY',
             'PHPDECIDE_AI_MODEL',
             'PHPDECIDE_AI_BASE_URL',
@@ -33,7 +33,15 @@ final class AiClientConfigTest extends TestCase
             'CURL_CA_BUNDLE',
             'PHPDECIDE_AI_INSECURE',
             'PHPDECIDE_AI_OMIT_MODEL',
-        ]);
+        ];
+
+        $this->snapshotEnv($names);
+
+        // Ensure tests run in a clean, deterministic env even if the developer
+        // has sourced env.bash.sh or otherwise configured these variables.
+        foreach ($names as $name) {
+            putenv($name);
+        }
     }
 
     protected function tearDown(): void
