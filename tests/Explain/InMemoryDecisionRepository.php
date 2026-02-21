@@ -43,7 +43,10 @@ final class InMemoryDecisionRepository implements DecisionRepository
 
     public function applicableTo(string $path): array
     {
-        return [];
+        return array_values(array_filter(
+            $this->active(),
+            fn(Decision $decision): bool => $decision->scope()->appliesTo($path)
+        ));
     }
 
     public function searchByKeyword(string $keyword): array

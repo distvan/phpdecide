@@ -119,8 +119,12 @@ package PhpDecide::Decision {
   }
 
   class YamlDecisionLoader {
-    +__construct(directory: string)
+    +__construct(directory: string, cacheFile: string? = null, enableCache: bool = true)
     +load(): iterable
+  }
+
+  class DecisionFileCollector {
+    {static} +collect(dir: string): array
   }
 
   interface DecisionRepository {
@@ -131,6 +135,10 @@ package PhpDecide::Decision {
     +searchByKeyword(keyword: string): array
   }
 
+  interface SearchIndexedDecisionRepository {
+    +haystackLowerFor(decision: Decision): string
+  }
+
   class FileDecisionRepository {
     +__construct(loader: DecisionLoader)
     +all(): array
@@ -138,10 +146,11 @@ package PhpDecide::Decision {
     +findById(id: DecisionId): Decision?
     +applicableTo(path: string): array
     +searchByKeyword(keyword: string): array
+    +haystackLowerFor(decision: Decision): string
   }
 
   class DecisionFactory {
-    +fromArray(data: array): Decision
+    {static} +fromArray(data: array): Decision
   }
 }
 
@@ -151,8 +160,27 @@ package PhpDecide::AI {
     +explainDecision(question: string, decisions: array): string
   }
 
+  class AiClientConfig {
+    +__construct(
+      apiKey: string,
+      model: string,
+      baseUrl: string,
+      chatCompletionsPath: string,
+      timeoutSeconds: int,
+      authHeaderName: string,
+      authPrefix: string,
+      organization: string?,
+      project: string?,
+      systemPromptOverride: string?,
+      caInfoPath: string?,
+      insecureSkipVerify: bool
+    )
+    {static} +fromEnvironment(): AiClientConfig?
+  }
+
   class AiClientFactory {
-    {static} +fromEnvironment(): AiClient?
+    {static} +fromEnvironment(httpClient: PhpDecide::AI::Http::HttpClient? = null): AiClient?
+    {static} +fromConfig(config: AiClientConfig, httpClient: PhpDecide::AI::Http::HttpClient? = null): AiClient
   }
 
   class OpenAiChatCompletionsClient {
@@ -160,15 +188,35 @@ package PhpDecide::AI {
       apiKey: string,
       model: string,
       baseUrl: string = "https://api.openai.com",
+      chatCompletionsPath: string = "/v1/chat/completions",
+      authHeaderName: string = "Authorization",
+      authPrefix: string = "Bearer ",
       timeoutSeconds: int = 20,
       organization: string? = null,
       project: string? = null,
-      systemPromptOverride: string? = null
+      systemPromptOverride: string? = null,
+      caInfoPath: string? = null,
+      insecureSkipVerify: bool = false,
+      httpClient: PhpDecide::AI::Http::HttpClient? = null
     )
     +explainDecision(question: string, decisions: array): string
   }
 
   class AiClientException
+}
+
+package PhpDecide::AI::Http {
+  interface HttpClient {
+    +post(url: string, headers: array, body: string, timeoutSeconds: int, caInfoPath: string? = null): HttpResponse
+  }
+
+  class HttpResponse {
+    +__construct(statusCode: int, body: string)
+  }
+
+  class CurlHttpClient {
+    +post(url: string, headers: array, body: string, timeoutSeconds: int, caInfoPath: string? = null): HttpResponse
+  }
 }
 
 package PhpDecide::Explain {
@@ -189,7 +237,7 @@ package PhpDecide::Explain {
 
   class DecisionMatcher {
     +__construct(repository: PhpDecide::Decision::DecisionRepository)
-    +match(question: string): array
+    +match(question: string, decisions: iterable? = null): array
   }
 
   class Explanation {
@@ -226,18 +274,26 @@ Scope --> "1" ScopeType : type
 ' --- Interfaces / implementations ---
 YamlDecisionLoader ..|> DecisionLoader
 FileDecisionRepository ..|> DecisionRepository
+FileDecisionRepository ..|> SearchIndexedDecisionRepository
 OpenAiChatCompletionsClient ..|> PhpDecide::AI::AiClient
 AiClientExplainer ..|> PhpDecide::Explain::AiExplainer
+CurlHttpClient ..|> PhpDecide::AI::Http::HttpClient
 
 ' --- Inheritance ---
 PhpDecide::CLI::ExplainCommand --|> Symfony::Console::Command
 PhpDecide::CLI::DecisionsLintCommand --|> Symfony::Console::Command
 
 ' --- Dependencies (usage) ---
+YamlDecisionLoader ..> DecisionFileCollector
 FileDecisionRepository ..> DecisionLoader
 FileDecisionRepository ..> Decision
 FileDecisionRepository ..> DecisionId
 DecisionFactory ..> Decision
+AiClientFactory ..> AiClientConfig
+AiClientFactory ..> PhpDecide::AI::Http::HttpClient
+AiClientFactory ..> OpenAiChatCompletionsClient
+OpenAiChatCompletionsClient o-- "1" PhpDecide::AI::Http::HttpClient : httpClient
+CurlHttpClient ..> PhpDecide::AI::Http::HttpResponse
 DecisionFactory ..> DecisionId
 DecisionFactory ..> DecisionStatus
 DecisionFactory ..> Scope
@@ -256,6 +312,7 @@ PhpDecide::CLI::ExplainCommand ..> PhpDecide::AI::AiClientFactory
 PhpDecide::CLI::ExplainCommand ..> PhpDecide::Explain::AiClientExplainer
 
 PhpDecide::CLI::DecisionsLintCommand ..> PhpDecideDefaults
+PhpDecide::CLI::DecisionsLintCommand ..> DecisionFileCollector
 PhpDecide::CLI::DecisionsLintCommand ..> DecisionFactory
 PhpDecide::CLI::DecisionsLintCommand ..> Symfony::Yaml::Yaml
 PhpDecide::CLI::DecisionsLintCommand ..> Symfony::Yaml::ParseException
@@ -265,6 +322,7 @@ PhpDecide::Explain::ExplainService ..> PhpDecide::Decision::DecisionRepository
 PhpDecide::Explain::ExplainService ..> PhpDecide::Explain::AiExplainer
 
 PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::DecisionRepository
+PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::SearchIndexedDecisionRepository
 PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::Decision
 PhpDecide::Explain::Explanation o-- "0..*" PhpDecide::Decision::Decision
 

@@ -4,30 +4,63 @@ declare(strict_types=1);
 
 namespace PhpDecide\AI;
 
+use PhpDecide\AI\Http\CurlHttpClient;
+use PhpDecide\AI\Http\HttpClient;
 use PhpDecide\Decision\Decision;
 use InvalidArgumentException;
 
 final class OpenAiChatCompletionsClient implements AiClient
 {
+    private readonly HttpClient $httpClient;
+
     public function __construct(
         private readonly string $apiKey,
         private readonly string $model,
         private readonly string $baseUrl = 'https://api.openai.com',
+        private readonly string $chatCompletionsPath = '/v1/chat/completions',
+        private readonly string $authHeaderName = 'Authorization',
+        private readonly string $authPrefix = 'Bearer ',
         private readonly int $timeoutSeconds = 20,
         private readonly ?string $organization = null,
         private readonly ?string $project = null,
         private readonly ?string $systemPromptOverride = null,
         private readonly ?string $caInfoPath = null,
         private readonly bool $insecureSkipVerify = false,
+        ?HttpClient $httpClient = null,
     ) {
+        $this->httpClient = $httpClient ?? new CurlHttpClient();
+
         if (trim($this->apiKey) === '') {
             throw new InvalidArgumentException('OpenAI API key must be a non-empty string.');
         }
 
         self::assertHeaderValueSafe($this->apiKey, 'OpenAI API key');
 
+        // Some OpenAI-compatible gateways encode the model in the URL path.
+        // In that case, the request must omit the "model" field.
         if (trim($this->model) === '') {
-            throw new InvalidArgumentException('OpenAI model must be a non-empty string.');
+            // Allowed: treat as "model omitted".
+        }
+
+        if (trim($this->authHeaderName) === '') {
+            throw new InvalidArgumentException('Auth header name must be a non-empty string.');
+        }
+
+        $headerName = trim($this->authHeaderName);
+        if (!preg_match('/^[A-Za-z0-9-]+$/', $headerName)) {
+            throw new InvalidArgumentException('Auth header name contains invalid characters.');
+        }
+
+        // Header value safety
+        self::assertHeaderValueSafe($this->authPrefix, 'Auth header prefix');
+
+        if (trim($this->chatCompletionsPath) === '') {
+            throw new InvalidArgumentException('Chat completions path must be a non-empty string.');
+        }
+
+        $path = trim($this->chatCompletionsPath);
+        if (!str_starts_with($path, '/')) {
+            throw new InvalidArgumentException('Chat completions path must start with a slash (e.g. /v1/chat/completions).');
         }
 
         if ($this->organization !== null) {
@@ -47,53 +80,32 @@ final class OpenAiChatCompletionsClient implements AiClient
         $systemPrompt = $this->systemPromptOverride ?? $this->defaultSystemPrompt();
 
         $decisionPayload = array_map(
-            static fn(Decision $d): array => [
-                'id' => $d->id()->value(),
-                'title' => $d->title(),
-                'status' => $d->status()->value,
-                'date' => $d->date()->format('Y-m-d'),
-                'scope' => [
-                    'type' => $d->scope()->type()->value,
-                    'paths' => $d->scope()->paths(),
-                ],
-                'summary' => $d->content()->summary(),
-                'rationale' => $d->content()->rationale(),
-                'alternatives' => $d->content()->alternatives(),
-                'examples' => [
-                    'allowed' => $d->examples()->allowed(),
-                    'forbidden' => $d->examples()->forbidden(),
-                ],
-                'rules' => $d->rules() ? [
-                    'forbid' => $d->rules()->forbid(),
-                    'allow' => $d->rules()->allow(),
-                ] : null,
-                'references' => $d->references() ? [
-                    'issues' => $d->references()->issues(),
-                    'commits' => $d->references()->commits(),
-                    'adr' => $d->references()->adr(),
-                ] : null,
-                'ai' => $d->aiMetadata() ? [
-                    'explain_style' => $d->aiMetadata()->explainStyle(),
-                    'keywords' => $d->aiMetadata()->keywords(),
-                ] : null,
-            ],
+            static fn(Decision $d): array => self::decisionToCompactPayload($d),
             $decisions
         );
 
         $userContent = "Question:\n{$question}\n\nRecorded decisions (authoritative source of truth):\n";
-        $userContent .= json_encode($decisionPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '[]';
+        $userContent .= self::encodePayload($decisionPayload);
         $userContent .= "\n\nTask: Summarize ONLY what is recorded above. If something is missing, say it's not recorded.";
 
         $payload = [
-            'model' => $this->model,
             'temperature' => 0.2,
+            // Some gateways default to streaming; we only support non-streaming JSON responses.
+            'stream' => false,
             'messages' => [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $userContent],
             ],
         ];
 
-        $response = $this->postJson($this->baseUrl . '/v1/chat/completions', $payload);
+        $model = trim($this->model);
+        if ($model !== '') {
+            $payload['model'] = $model;
+        }
+
+        $baseUrl = rtrim(trim($this->baseUrl), '/');
+        $endpointPath = '/' . ltrim(trim($this->chatCompletionsPath), '/');
+        $response = $this->postJson($baseUrl . $endpointPath, $payload);
 
         $content = $response['choices'][0]['message']['content'] ?? null;
         if (!is_string($content) || trim($content) === '') {
@@ -125,47 +137,116 @@ PROMPT;
      */
     private function postJson(string $url, array $payload): array
     {
-        self::assertCurlAvailable();
-
         $json = self::encodePayload($payload);
         $headers = $this->buildHeaders();
-        $ch = $this->initCurl($url, $headers, $json);
 
-        try {
-            $this->applyTlsOptions($ch);
-            [$raw, $status, $errno, $error] = $this->execCurl($ch);
-        } finally {
-            unset($ch);
+        if ($this->insecureSkipVerify) {
+            throw new AiClientException(
+                'Insecure TLS verification (PHPDECIDE_AI_INSECURE) is not supported. ' .
+                'Configure PHPDECIDE_AI_CAINFO / CURL_CA_BUNDLE or fix your system trust store instead.'
+            );
         }
 
-        if ($raw === false) {
-            throw new AiClientException(sprintf('AI request failed (%d): %s', $errno, $error));
+        $response = $this->httpClient->post(
+            url: $url,
+            headers: $headers,
+            body: $json,
+            timeoutSeconds: $this->timeoutSeconds,
+            caInfoPath: $this->caInfoPath,
+        );
+
+        $raw = $response->body;
+        $status = $response->statusCode;
+
+        if ($status < 200 || $status >= 300) {
+            $decoded = self::tryDecodeJson($raw);
+            if (is_array($decoded)) {
+                $this->throwForHttpStatus($status, $decoded, $url);
+            }
+
+            $snippet = self::formatResponseSnippet($raw);
+            $authDiag = $this->formatAuthDiagnostics();
+            throw new AiClientException(sprintf(
+                'AI request failed (HTTP %d). Response was not valid JSON for %s. %s Body starts with: %s',
+                $status,
+                $url,
+                $authDiag,
+                $snippet
+            ));
         }
 
-        $decoded = self::decodeJson($raw);
-        $this->throwForHttpStatus($status, $decoded, $url);
+        $decoded = self::tryDecodeJson($raw);
+        if (!is_array($decoded)) {
+            $snippet = self::formatResponseSnippet($raw);
+            $authDiag = $this->formatAuthDiagnostics();
+            throw new AiClientException(sprintf(
+                'AI response was not valid JSON (HTTP %d) from %s. %s Body starts with: %s',
+                $status,
+                $url,
+                $authDiag,
+                $snippet
+            ));
+        }
 
         return $decoded;
     }
 
-    private static function assertCurlAvailable(): void
+    private function formatAuthDiagnostics(): string
     {
-        if (!function_exists('curl_init')) {
-            throw new AiClientException('cURL extension is required for AI support.');
-        }
+        $name = trim($this->authHeaderName);
+        $prefix = $this->authPrefix;
+        $prefixSummary = $prefix === '' ? '[empty]' : $prefix;
+
+        return sprintf('Auth header sent: %s (prefix: %s).', $name, $prefixSummary);
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param array<mixed> $payload
      */
     private static function encodePayload(array $payload): string
     {
-        $json = json_encode($payload);
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($json === false) {
             throw new AiClientException('Unable to encode AI request JSON.');
         }
 
         return $json;
+    }
+
+    /**
+     * Keep the AI prompt payload compact: only include the fields needed to explain decisions.
+     *
+     * @return array<string, mixed>
+     */
+    private static function decisionToCompactPayload(Decision $decision): array
+    {
+        $scope = [
+            'type' => $decision->scope()->type()->value,
+        ];
+
+        $paths = $decision->scope()->paths();
+        if ($paths !== []) {
+            $scope['paths'] = $paths;
+        }
+
+        $payload = [
+            'id' => $decision->id()->value(),
+            'title' => $decision->title(),
+            'date' => $decision->date()->format('Y-m-d'),
+            'scope' => $scope,
+            'summary' => $decision->content()->summary(),
+            'rationale' => $decision->content()->rationale(),
+        ];
+
+        $rules = $decision->rules();
+        if ($rules !== null && $rules->hasRules()) {
+            $payload['rules'] = [
+                'forbid' => $rules->forbid(),
+                'allow' => $rules->allow(),
+            ];
+        }
+
+        return $payload;
     }
 
     /**
@@ -175,8 +256,13 @@ PROMPT;
     {
         $headers = [
             'Content-Type: application/json',
-            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
         ];
+
+        $authHeaderName = trim($this->authHeaderName);
+        $authValue = $this->authPrefix . $this->apiKey;
+        self::assertHeaderValueSafe($authValue, $authHeaderName);
+        $headers[] = $authHeaderName . ': ' . $authValue;
 
         if ($this->organization !== null && trim($this->organization) !== '') {
             $org = trim($this->organization);
@@ -200,71 +286,37 @@ PROMPT;
     }
 
     /**
-     * @param list<string> $headers
-     * @return \CurlHandle
+     * @return array<string, mixed>|null
      */
-    private function initCurl(string $url, array $headers, string $json): \CurlHandle
+    private static function tryDecodeJson(string $raw): ?array
     {
-        $ch = curl_init($url);
-        if ($ch === false) {
-            throw new AiClientException('Unable to initialize cURL.');
-        }
-
-        $connectTimeout = max(1, min(10, $this->timeoutSeconds));
-
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_POSTFIELDS => $json,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => $connectTimeout,
-            CURLOPT_TIMEOUT => $this->timeoutSeconds,
-        ]);
-
-        return $ch;
+        $decoded = json_decode(self::stripUtf8Bom($raw), true);
+        return is_array($decoded) ? $decoded : null;
     }
 
-    private function applyTlsOptions(\CurlHandle $ch): void
+    private static function stripUtf8Bom(string $raw): string
     {
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-
-        if ($this->caInfoPath !== null && trim($this->caInfoPath) !== '') {
-            curl_setopt($ch, CURLOPT_CAINFO, $this->caInfoPath);
+        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
+            return substr($raw, 3);
         }
 
-        if ($this->insecureSkipVerify) {
-            throw new AiClientException(
-                'Insecure TLS verification (PHPDECIDE_AI_INSECURE) is not supported. ' .
-                'Configure PHPDECIDE_AI_CAINFO / CURL_CA_BUNDLE or fix your system trust store instead.'
-            );
-        }
+        return $raw;
     }
 
-    /**
-     * @return array{0: string|false, 1: int, 2: int, 3: string}
-     */
-    private function execCurl(\CurlHandle $ch): array
+    private static function formatResponseSnippet(string $raw): string
     {
-        $raw = curl_exec($ch);
-        $errno = curl_errno($ch);
-        $error = curl_error($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        return [$raw, $status, $errno, $error];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function decodeJson(string $raw): array
-    {
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            throw new AiClientException('AI response was not valid JSON.');
+        $s = trim(self::stripUtf8Bom($raw));
+        if ($s === '') {
+            return '[empty body]';
         }
 
-        return $decoded;
+        $s = preg_replace('/\s+/', ' ', $s) ?? $s;
+        $max = 300;
+        if (mb_strlen($s) > $max) {
+            $s = mb_substr($s, 0, $max) . '...';
+        }
+
+        return $s;
     }
 
     /**

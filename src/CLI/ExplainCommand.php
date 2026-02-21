@@ -24,6 +24,8 @@ use Throwable;
 )]
 final class ExplainCommand extends Command
 {
+    private const ENV_DECISIONS_CACHE = 'PHPDECIDE_DECISIONS_CACHE';
+
     protected function configure(): void
     {
         $this->addArgument(
@@ -52,6 +54,13 @@ final class ExplainCommand extends Command
             InputOption::VALUE_NONE,
             'Fail if AI is enabled but unavailable or errors occur (default is to fall back to plain text).'
         );
+
+        $this->addOption(
+            'no-cache',
+            null,
+            InputOption::VALUE_NONE,
+            'Disable decision cache (forces re-reading and re-parsing YAML files).'
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -61,7 +70,11 @@ final class ExplainCommand extends Command
         $useAi = (bool) $input->getOption('ai');
         $aiStrict = (bool) $input->getOption('ai-strict');
 
-        $loader = new YamlDecisionLoader(PhpDecideDefaults::DECISIONS_DIR);
+        $noCache = (bool) $input->getOption('no-cache');
+        $envCacheEnabled = self::envBoolDefaultTrue(self::ENV_DECISIONS_CACHE);
+        $enableCache = !$noCache && $envCacheEnabled;
+
+        $loader = new YamlDecisionLoader(PhpDecideDefaults::DECISIONS_DIR, enableCache: $enableCache);
         $repository = new FileDecisionRepository($loader);
 
         $aiExplainer = null;
@@ -119,5 +132,16 @@ final class ExplainCommand extends Command
         $output->writeln('');
 
         return Command::SUCCESS;
+    }
+
+    private static function envBoolDefaultTrue(string $name): bool
+    {
+        $value = getenv($name);
+        if ($value === false || $value === '') {
+            return true;
+        }
+
+        $value = strtolower(trim((string) $value));
+        return !in_array($value, ['0', 'false', 'no', 'off'], true);
     }
 }
