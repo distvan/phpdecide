@@ -34,6 +34,41 @@ final class DecisionFactoryTest extends TestCase
         DecisionFactory::fromArray($data);
     }
 
+    public function testFromArrayThrowsWhenIdIsNotString(): void
+    {
+        $data = $this->validData();
+        $data['id'] = 123;
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Field 'id' must be a non-empty string");
+
+        DecisionFactory::fromArray($data);
+    }
+
+    public function testFromArrayThrowsWhenScopeTypeIsInvalid(): void
+    {
+        $data = $this->validData();
+        $data['scope'] = [
+            'type' => 'not-a-scope-type',
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid scope type:');
+
+        DecisionFactory::fromArray($data);
+    }
+
+    public function testFromArrayThrowsWhenAlternativesNotArray(): void
+    {
+        $data = $this->validData();
+        $data['decision']['alternatives'] = 'nope';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Decision alternatives must be an array');
+
+        DecisionFactory::fromArray($data);
+    }
+
     public function testFromArrayThrowsWhenDateInvalid(): void
     {
         $data = $this->validData();
@@ -79,6 +114,39 @@ final class DecisionFactoryTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Missing required field: explain_style');
+
+        DecisionFactory::fromArray($data);
+    }
+
+    public function testFromArrayThrowsWhenScopeIsNotArray(): void
+    {
+        $data = $this->validData();
+        $data['scope'] = 'global';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Field 'scope' must be an array");
+
+        DecisionFactory::fromArray($data);
+    }
+
+    public function testFromArrayThrowsWhenDecisionSectionIsNotArray(): void
+    {
+        $data = $this->validData();
+        $data['decision'] = 'summary';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Field 'decision' must be an array");
+
+        DecisionFactory::fromArray($data);
+    }
+
+    public function testFromArrayThrowsWhenReferencesIsNotArray(): void
+    {
+        $data = $this->validData();
+        $data['references'] = 'ADR-0001';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Field 'references' must be an array");
 
         DecisionFactory::fromArray($data);
     }
