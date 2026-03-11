@@ -80,7 +80,7 @@ final class OpenAiChatCompletionsClient implements AiClient
         $systemPrompt = $this->systemPromptOverride ?? $this->defaultSystemPrompt();
 
         $decisionPayload = array_map(
-            static fn(Decision $d): array => self::decisionToCompactPayload($d),
+            static fn(Decision $d): array => DecisionPayloadNormalizer::decisionToCompactPayload($d),
             $decisions
         );
 
@@ -211,42 +211,6 @@ PROMPT;
         }
 
         return $json;
-    }
-
-    /**
-     * Keep the AI prompt payload compact: only include the fields needed to explain decisions.
-     *
-     * @return array<string, mixed>
-     */
-    private static function decisionToCompactPayload(Decision $decision): array
-    {
-        $scope = [
-            'type' => $decision->scope()->type()->value,
-        ];
-
-        $paths = $decision->scope()->paths();
-        if ($paths !== []) {
-            $scope['paths'] = $paths;
-        }
-
-        $payload = [
-            'id' => $decision->id()->value(),
-            'title' => $decision->title(),
-            'date' => $decision->date()->format('Y-m-d'),
-            'scope' => $scope,
-            'summary' => $decision->content()->summary(),
-            'rationale' => $decision->content()->rationale(),
-        ];
-
-        $rules = $decision->rules();
-        if ($rules !== null && $rules->hasRules()) {
-            $payload['rules'] = [
-                'forbid' => $rules->forbid(),
-                'allow' => $rules->allow(),
-            ];
-        }
-
-        return $payload;
     }
 
     /**

@@ -165,6 +165,29 @@ Environment variables:
 - `PHPDECIDE_AI_SYSTEM_PROMPT` (optional) - override the system prompt
 - `PHPDECIDE_AI_CAINFO` (optional) - path to a CA bundle (`cacert.pem`) if you get cURL SSL errors (e.g. cURL error 60)
 
+### AI egress guard (recommended for enterprise/CI)
+
+If you run PHPDecide in regulated environments or CI, enable the **LLM egress guard**.
+It adds deterministic checks (size limits + secret detection) before any outbound AI call, and can also redact secrets from AI output.
+
+Enable:
+
+- `PHPDECIDE_AI_GUARD=1`
+
+Optional configuration:
+
+- `PHPDECIDE_AI_GUARD_FAILURE_MODE` (`fail_closed`|`fail_open`, default: `fail_closed`)
+- `PHPDECIDE_AI_GUARD_INPUT_MAX_CHARS` (default: `8000`)
+- `PHPDECIDE_AI_GUARD_DLP_ENABLED` (`true`|`false`, default: `true`)
+- `PHPDECIDE_AI_GUARD_INPUT_DLP_ACTION` (`block`|`monitor`|`sanitize`, default: `block`)
+- `PHPDECIDE_AI_GUARD_OUTPUT_DLP_ACTION` (`sanitize`|`monitor`|`block`, default: `sanitize`)
+- `PHPDECIDE_AI_GUARD_AUDIT_ENABLED` (`true`|`false`, default: `true`) - writes structured JSON audit events to stderr
+
+Notes:
+
+- If the guard detects secrets in the **recorded decisions payload**, it blocks the AI call (to avoid leaking decision content).
+- If it detects secrets in the **question**, behavior depends on `PHPDECIDE_AI_GUARD_INPUT_DLP_ACTION`.
+
 TLS note: if you enable `--ai` and hit TLS/certificate issues, configure `PHPDECIDE_AI_CAINFO` (CA bundle). TLS verification is enforced; there is no insecure/skip-verify mode.
 
 Gateway / DIAL note: if your gateway puts the model into the URL (instead of JSON), set `PHPDECIDE_AI_CHAT_COMPLETIONS_PATH` accordingly and enable `PHPDECIDE_AI_OMIT_MODEL=true`.

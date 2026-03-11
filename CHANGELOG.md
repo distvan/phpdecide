@@ -4,6 +4,17 @@ All notable changes to **PHPDecide** will be documented in this file.
 
 This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- CLI AI egress guard (recommended for enterprise/CI) to reduce sensitive-data egress risk when using `explain --ai`.
+  - Enable via `PHPDECIDE_AI_GUARD=1`.
+  - Configurable via `PHPDECIDE_AI_GUARD_FAILURE_MODE`, `PHPDECIDE_AI_GUARD_INPUT_MAX_CHARS`, DLP actions, and audit toggles.
+
+### Fixed
+- Decision parsing/validation is now more defensive against malformed YAML types (e.g. non-string `id`, invalid `scope.type`, non-array list fields), raising clear `InvalidArgumentException` errors instead of leaking PHP `TypeError`.
+- `decisions:lint` now catches unexpected runtime errors during YAML parsing/decision validation and reports them as lint failures instead of crashing.
+
 ## [1.1.0] - 2026-02-21
 
 ### Added
@@ -70,3 +81,4 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 [1.0.0]: https://github.com/distvan/phpdecide/releases/tag/v1.0.0
 [1.1.0]: https://github.com/distvan/phpdecide/releases/tag/v1.1.0
+[Unreleased]: https://github.com/distvan/phpdecide/compare/v1.1.0...HEAD

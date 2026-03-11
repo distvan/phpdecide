@@ -7,6 +7,7 @@ namespace PhpDecide\Tests\AI;
 use PhpDecide\AI\AiClient;
 use PhpDecide\AI\AiClientFactory;
 use PhpDecide\AI\OpenAiChatCompletionsClient;
+use PhpDecide\AI\Guard\EgressGuardAiClient;
 use PHPUnit\Framework\TestCase;
 
 final class AiClientFactoryTest extends TestCase
@@ -35,6 +36,15 @@ final class AiClientFactoryTest extends TestCase
             'CURL_CA_BUNDLE',
             'PHPDECIDE_AI_INSECURE',
             'PHPDECIDE_AI_OMIT_MODEL',
+            'PHPDECIDE_AI_GUARD',
+            'PHPDECIDE_AI_GUARD_FAILURE_MODE',
+            'PHPDECIDE_AI_GUARD_INPUT_MAX_CHARS',
+            'PHPDECIDE_AI_GUARD_DLP_ENABLED',
+            'PHPDECIDE_AI_GUARD_INPUT_DLP_ACTION',
+            'PHPDECIDE_AI_GUARD_OUTPUT_DLP_ACTION',
+            'PHPDECIDE_AI_GUARD_AUDIT_ENABLED',
+            'PHPDECIDE_AI_GUARD_AUDIT_LOG_PROMPT',
+            'PHPDECIDE_AI_GUARD_AUDIT_LOG_RESPONSE',
         ]);
     }
 
@@ -111,6 +121,16 @@ final class AiClientFactoryTest extends TestCase
         self::assertInstanceOf(OpenAiChatCompletionsClient::class, $client);
 
         self::assertSame('', $this->readPrivatePropertyString($client, 'model'));
+    }
+
+    public function testFromEnvironmentWrapsWithGuardWhenEnabled(): void
+    {
+        putenv(self::API_KEY_ENV);
+        putenv('PHPDECIDE_AI_GUARD=1');
+
+        $client = AiClientFactory::fromEnvironment();
+        self::assertInstanceOf(AiClient::class, $client);
+        self::assertInstanceOf(EgressGuardAiClient::class, $client);
     }
 
     public function testFromEnvironmentNormalizesBearerPrefixWithSpace(): void
