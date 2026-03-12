@@ -11,8 +11,9 @@ use UnexpectedValueException;
 
 final class YamlDecisionLoader implements DecisionLoader
 {
-    private const CACHE_VERSION = 1;
+    private const CACHE_VERSION = 2;
     private const DEFAULT_CACHE_FILENAME = '.phpdecide-decisions.cache';
+    private const MAX_CACHE_BYTES = 5_000_000;
 
     private string $directory;
     private ?string $cacheFile;
@@ -51,7 +52,8 @@ final class YamlDecisionLoader implements DecisionLoader
                 }
             }
 
-            $decisions = [];
+            /** @var list<array<string, mixed>> $decisionsData */
+            $decisionsData = [];
 
             foreach ($files as $file) {
                 try {
@@ -65,12 +67,12 @@ final class YamlDecisionLoader implements DecisionLoader
                 }
 
                 $decision = DecisionFactory::fromArray($data);
-                $decisions[] = $decision;
+                $decisionsData[] = $data;
                 yield $decision;
             }
 
             if ($this->cacheFile !== null) {
-                $this->tryWriteCache($signature, $decisions);
+                $this->tryWriteCache($signature, $decisionsData);
             }
         } catch (UnexpectedValueException $e) {
             throw new InvalidArgumentException("Unable to read directory: {$this->directory}", previous: $e);
@@ -130,13 +132,17 @@ final class YamlDecisionLoader implements DecisionLoader
             return null;
         }
 
-        $raw = $this->safeReadFile($this->cacheFile);
-        if ($raw === null || $raw === '') {
-            return null;
+        $payload = null;
+
+        $size = $this->safeFileSize($this->cacheFile);
+        if ($size !== null && $size <= self::MAX_CACHE_BYTES) {
+            $raw = $this->safeReadFile($this->cacheFile);
+            if ($raw !== null && $raw !== '') {
+                $payload = $this->safeJsonDecode($raw);
+            }
         }
 
-        $payload = $this->safeUnserialize($raw, ['allowed_classes' => $this->allowedCacheClasses()]);
-        return is_array($payload) ? $payload : null;
+        return $payload;
     }
 
     /**
@@ -156,12 +162,23 @@ final class YamlDecisionLoader implements DecisionLoader
         }
 
         if ($valid) {
-            foreach ($candidate as $decision) {
-                if (!$decision instanceof Decision) {
+            $decisions = [];
+
+            foreach ($candidate as $decisionData) {
+                if (!is_array($decisionData)) {
+                    $valid = false;
+                    break;
+                }
+
+                try {
+                    $decisions[] = DecisionFactory::fromArray($decisionData);
+                } catch (InvalidArgumentException) {
                     $valid = false;
                     break;
                 }
             }
+
+            $candidate = $decisions;
         }
 
         return $valid ? $candidate : null;
@@ -169,9 +186,9 @@ final class YamlDecisionLoader implements DecisionLoader
 
     /**
      * @param list<array{path: string, mtime: int, size: int}> $signature
-     * @param Decision[] $decisions
+     * @param list<array<string, mixed>> $decisionsData
      */
-    private function tryWriteCache(array $signature, array $decisions): void
+    private function tryWriteCache(array $signature, array $decisionsData): void
     {
         if ($signature === [] || $this->cacheFile === null) {
             return;
@@ -180,7 +197,7 @@ final class YamlDecisionLoader implements DecisionLoader
         $payload = [
             'version' => self::CACHE_VERSION,
             'signature' => $signature,
-            'decisions' => $decisions,
+            'decisions' => $decisionsData,
         ];
 
         $dir = dirname($this->cacheFile);
@@ -189,7 +206,13 @@ final class YamlDecisionLoader implements DecisionLoader
         }
 
         // Best-effort; cache must never break normal behavior.
-        $this->safeWriteFile($this->cacheFile, serialize($payload));
+        try {
+            $json = json_encode($payload, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return;
+        }
+
+        $this->safeWriteFile($this->cacheFile, $json);
     }
 
     private function safeFileMTime(string $path): ?int
@@ -231,11 +254,17 @@ final class YamlDecisionLoader implements DecisionLoader
     }
 
     /**
-     * @param array<string, mixed> $options
+     * @return array<string, mixed>|null
      */
-    private function safeUnserialize(string $raw, array $options): mixed
+    private function safeJsonDecode(string $raw): ?array
     {
-        return $this->trapWarnings(static fn() => unserialize($raw, $options));
+        try {
+            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     private function safeMkdir(string $dir, int $mode, bool $recursive): bool
@@ -281,25 +310,5 @@ final class YamlDecisionLoader implements DecisionLoader
         }
 
         return $hadWarning ? null : $result;
-    }
-
-    /**
-     * @return list<class-string>
-     */
-    private function allowedCacheClasses(): array
-    {
-        return [
-            \DateTimeImmutable::class,
-            Decision::class,
-            DecisionContent::class,
-            DecisionId::class,
-            DecisionStatus::class,
-            Examples::class,
-            Rules::class,
-            Scope::class,
-            ScopeType::class,
-            AiMetadata::class,
-            References::class,
-        ];
     }
 }
