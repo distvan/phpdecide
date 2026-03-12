@@ -1,6 +1,6 @@
 @startuml
 ' PHPDecide - Class diagram (overview)
-' Includes: Decision domain + Explain + AI + CLI
+' Includes: Decision domain + Explain + AI + AI Guard + CLI
 
 skinparam shadowing false
 skinparam classAttributeIconSize 0
@@ -202,6 +202,10 @@ package PhpDecide::AI {
     +explainDecision(question: string, decisions: array): string
   }
 
+  class DecisionPayloadNormalizer {
+    {static} +decisionToCompactPayload(decision: PhpDecide::Decision::Decision): array
+  }
+
   class AiClientException
 }
 
@@ -216,6 +220,62 @@ package PhpDecide::AI::Http {
 
   class CurlHttpClient {
     +post(url: string, headers: array, body: string, timeoutSeconds: int, caInfoPath: string? = null): HttpResponse
+  }
+}
+
+package PhpDecide::AI::Guard {
+  class EgressGuardAiClient {
+    +__construct(
+      inner: PhpDecide::AI::AiClient,
+      policy: GuardPolicy,
+      dlpScanner: DlpScanner = new DlpScanner(),
+      auditLogger: AuditLogger = new NullAuditLogger(),
+      routeId: string = "cli:explain"
+    )
+    +explainDecision(question: string, decisions: array): string
+  }
+
+  class GuardPolicy {
+    +__construct(
+      id: string,
+      version: string,
+      failureMode: string,
+      inputMaxChars: int,
+      dlpEnabled: bool,
+      inputDlpAction: string,
+      outputDlpAction: string,
+      auditLogPrompt: string,
+      auditLogResponse: string,
+      auditEnabled: bool
+    )
+    {static} +baselineEnterprise(): GuardPolicy
+  }
+
+  class GuardPolicyFactory {
+    {static} +isEnabledFromEnvironment(): bool
+    {static} +fromEnvironment(): GuardPolicy
+  }
+
+  class DlpScanner {
+    +scan(text: string): array
+    +redact(text: string): string
+  }
+
+  class Finding {
+    +__construct(id: string, severity: string, category: string, message: string, evidence: array = [])
+    +toArray(): array
+  }
+
+  interface AuditLogger {
+    +log(event: array): void
+  }
+
+  class NullAuditLogger {
+    +log(event: array): void
+  }
+
+  class StderrJsonAuditLogger {
+    +log(event: array): void
   }
 }
 
@@ -276,8 +336,11 @@ YamlDecisionLoader ..|> DecisionLoader
 FileDecisionRepository ..|> DecisionRepository
 FileDecisionRepository ..|> SearchIndexedDecisionRepository
 OpenAiChatCompletionsClient ..|> PhpDecide::AI::AiClient
+PhpDecide::AI::Guard::EgressGuardAiClient ..|> PhpDecide::AI::AiClient
 AiClientExplainer ..|> PhpDecide::Explain::AiExplainer
 CurlHttpClient ..|> PhpDecide::AI::Http::HttpClient
+PhpDecide::AI::Guard::NullAuditLogger ..|> PhpDecide::AI::Guard::AuditLogger
+PhpDecide::AI::Guard::StderrJsonAuditLogger ..|> PhpDecide::AI::Guard::AuditLogger
 
 ' --- Inheritance ---
 PhpDecide::CLI::ExplainCommand --|> Symfony::Console::Command
@@ -292,8 +355,13 @@ DecisionFactory ..> Decision
 AiClientFactory ..> AiClientConfig
 AiClientFactory ..> PhpDecide::AI::Http::HttpClient
 AiClientFactory ..> OpenAiChatCompletionsClient
+AiClientFactory ..> PhpDecide::AI::Guard::GuardPolicyFactory
+AiClientFactory ..> PhpDecide::AI::Guard::EgressGuardAiClient
+AiClientFactory ..> PhpDecide::AI::Guard::StderrJsonAuditLogger
+AiClientFactory ..> PhpDecide::AI::Guard::NullAuditLogger
 OpenAiChatCompletionsClient o-- "1" PhpDecide::AI::Http::HttpClient : httpClient
 CurlHttpClient ..> PhpDecide::AI::Http::HttpResponse
+OpenAiChatCompletionsClient ..> DecisionPayloadNormalizer
 DecisionFactory ..> DecisionId
 DecisionFactory ..> DecisionStatus
 DecisionFactory ..> Scope
@@ -329,5 +397,14 @@ PhpDecide::Explain::Explanation o-- "0..*" PhpDecide::Decision::Decision
 PhpDecide::AI::AiClientFactory ..> OpenAiChatCompletionsClient
 OpenAiChatCompletionsClient ..> PhpDecide::Decision::Decision
 OpenAiChatCompletionsClient ..> AiClientException
+
+PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::AiClient : inner
+PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::Guard::GuardPolicy : policy
+PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::Guard::DlpScanner : dlpScanner
+PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::Guard::AuditLogger : auditLogger
+PhpDecide::AI::Guard::EgressGuardAiClient ..> DecisionPayloadNormalizer
+PhpDecide::AI::Guard::EgressGuardAiClient ..> AiClientException
+PhpDecide::AI::Guard::DlpScanner ..> PhpDecide::AI::Guard::Finding
+PhpDecide::AI::Guard::GuardPolicyFactory ..> PhpDecide::AI::Guard::GuardPolicy
 
 @enduml
