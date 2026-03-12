@@ -199,3 +199,29 @@ Example (DIAL / Azure-style OpenAI proxy):
 - `PHPDECIDE_AI_OMIT_MODEL=true`
 - `PHPDECIDE_AI_AUTH_HEADER_NAME=Api-Key`
 - `PHPDECIDE_AI_AUTH_PREFIX=`
+
+### Security model (threat model + supported/unsupported configs)
+
+Threat model (what we try to prevent):
+
+- Accidental sensitive-data egress to LLM providers (secrets in questions or recorded decisions).
+- Misconfiguration that weakens transport security (e.g. non-HTTPS endpoints, insecure TLS).
+- “Operational surprises” (e.g. redirects to unexpected hosts) when calling OpenAI-compatible gateways.
+
+Out of scope (what PHPDecide does NOT attempt to solve):
+
+- A compromised developer machine or CI runner.
+- A malicious or already-compromised LLM gateway/provider.
+- Full DLP coverage. The guard uses deterministic regex-based checks; it reduces risk but cannot guarantee detection.
+
+Supported configs / guarantees:
+
+- TLS verification is always enabled for AI calls.
+- AI base URL must be `https://...` (exception: `http://localhost` for local testing).
+- HTTP redirect following is disabled in the cURL transport.
+- The AI egress guard avoids logging raw prompt/response content; audit events are structured and written to stderr.
+
+Unsupported configs (intentional):
+
+- Disabling TLS verification (there is no “insecure skip verify” mode).
+- Using non-loopback `http://` AI endpoints.
