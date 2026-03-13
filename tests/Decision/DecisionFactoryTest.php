@@ -40,7 +40,7 @@ final class DecisionFactoryTest extends TestCase
         $data['id'] = 123;
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Field 'id' must be a non-empty string");
+        $this->expectExceptionMessage("Field 'id' must be a non-empty string.");
 
         DecisionFactory::fromArray($data);
     }
@@ -53,7 +53,7 @@ final class DecisionFactoryTest extends TestCase
         ];
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid scope type:');
+        $this->expectExceptionMessage('Invalid scope type: not-a-scope-type');
 
         DecisionFactory::fromArray($data);
     }
@@ -64,7 +64,7 @@ final class DecisionFactoryTest extends TestCase
         $data['decision']['alternatives'] = 'nope';
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Decision alternatives must be an array');
+        $this->expectExceptionMessage('Decision alternatives must be an array.');
 
         DecisionFactory::fromArray($data);
     }
@@ -75,7 +75,7 @@ final class DecisionFactoryTest extends TestCase
         $data['date'] = 'not-a-date';
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid date format:');
+        $this->expectExceptionMessage('Invalid date format: not-a-date');
 
         DecisionFactory::fromArray($data);
     }
@@ -89,7 +89,7 @@ final class DecisionFactoryTest extends TestCase
         ];
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Scope paths must be an array');
+        $this->expectExceptionMessage('Scope paths must be an array.');
 
         DecisionFactory::fromArray($data);
     }
@@ -100,7 +100,7 @@ final class DecisionFactoryTest extends TestCase
         $data['decision']['rationale'] = 'because';
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Decision rationale must be an array');
+        $this->expectExceptionMessage('Decision rationale must be an array.');
 
         DecisionFactory::fromArray($data);
     }
@@ -124,7 +124,7 @@ final class DecisionFactoryTest extends TestCase
         $data['scope'] = 'global';
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Field 'scope' must be an array");
+        $this->expectExceptionMessage("Field 'scope' must be an array.");
 
         DecisionFactory::fromArray($data);
     }
@@ -135,7 +135,7 @@ final class DecisionFactoryTest extends TestCase
         $data['decision'] = 'summary';
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Field 'decision' must be an array");
+        $this->expectExceptionMessage("Field 'decision' must be an array.");
 
         DecisionFactory::fromArray($data);
     }
@@ -146,7 +146,7 @@ final class DecisionFactoryTest extends TestCase
         $data['references'] = 'ADR-0001';
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Field 'references' must be an array");
+        $this->expectExceptionMessage("Field 'references' must be an array.");
 
         DecisionFactory::fromArray($data);
     }

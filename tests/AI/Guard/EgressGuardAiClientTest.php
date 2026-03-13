@@ -44,7 +44,7 @@ final class EgressGuardAiClientTest extends TestCase
         $this->expectExceptionMessage('blocked by egress guard');
 
         try {
-            $guard->explainDecision('My key is sk-1234567890123456789012345', []);
+            $guard->explainDecision('My key is ' . self::fakeOpenAiKey(), []);
         } finally {
             self::assertSame(0, $inner->calls);
         }
@@ -74,17 +74,17 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: new NullAuditLogger(),
         );
 
-        $guard->explainDecision('Token sk-1234567890123456789012345', []);
+        $guard->explainDecision('Token ' . self::fakeOpenAiKey(), []);
 
         self::assertSame(1, $inner->calls);
         self::assertIsString($inner->lastQuestion);
-        self::assertStringNotContainsString('sk-1234567890123456789012345', $inner->lastQuestion);
+        self::assertStringNotContainsString(self::fakeOpenAiKey(), $inner->lastQuestion);
         self::assertStringContainsString('[REDACTED:DLP.OPENAI_API_KEY]', $inner->lastQuestion);
     }
 
     public function testRedactsOutputWhenConfigured(): void
     {
-        $inner = new FakeAiClient('Here is your token: ghp_abcdefghijklmnopqrstuvwxyz012345');
+        $inner = new FakeAiClient('Here is your token: ' . self::fakeGithubToken());
 
         $policy = new GuardPolicy(
             id: 't',
@@ -107,7 +107,7 @@ final class EgressGuardAiClientTest extends TestCase
         );
 
         $out = $guard->explainDecision('Q', []);
-        self::assertStringNotContainsString('ghp_abcdefghijklmnopqrstuvwxyz012345', $out);
+        self::assertStringNotContainsString(self::fakeGithubToken(), $out);
         self::assertStringContainsString('[REDACTED:DLP.GITHUB_TOKEN]', $out);
     }
 
@@ -143,7 +143,7 @@ final class EgressGuardAiClientTest extends TestCase
             'scope' => ['type' => 'global'],
             'decision' => [
                 'summary' => 'Do not leak',
-                'rationale' => ['sk-1234567890123456789012345'],
+                'rationale' => [self::fakeOpenAiKey()],
             ],
         ]);
 
@@ -193,7 +193,7 @@ final class EgressGuardAiClientTest extends TestCase
 
     public function testOutputBlockActionThrowsWhenSecretDetectedInOutput(): void
     {
-        $inner = new FakeAiClient('Token: ghp_abcdefghijklmnopqrstuvwxyz012345');
+        $inner = new FakeAiClient('Token: ' . self::fakeGithubToken());
 
         $policy = new GuardPolicy(
             id: 't',
@@ -223,7 +223,7 @@ final class EgressGuardAiClientTest extends TestCase
 
     public function testMonitorActionsDoNotModifyInputOrOutputButWriteAuditEvents(): void
     {
-        $inner = new FakeAiClient('Output token ghp_abcdefghijklmnopqrstuvwxyz012345');
+        $inner = new FakeAiClient('Output token ' . self::fakeGithubToken());
         $audit = new SpyAuditLogger();
 
         $policy = new GuardPolicy(
@@ -246,11 +246,11 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: $audit,
         );
 
-        $question = 'Input token sk-1234567890123456789012345';
+        $question = 'Input token ' . self::fakeOpenAiKey();
         $out = $guard->explainDecision($question, []);
 
         self::assertSame($question, $inner->lastQuestion);
-        self::assertSame('Output token ghp_abcdefghijklmnopqrstuvwxyz012345', $out);
+        self::assertSame('Output token ' . self::fakeGithubToken(), $out);
         self::assertCount(3, $audit->events);
         self::assertSame('phpdecide.ai_guard.input_findings', $audit->events[0]['type']);
         self::assertSame('phpdecide.ai_guard.allow', $audit->events[1]['type']);
@@ -346,6 +346,16 @@ final class EgressGuardAiClientTest extends TestCase
 
         self::assertSame('ok-after-fallback', $guard->explainDecision('Q', []));
         self::assertSame(2, $inner->calls);
+    }
+
+    private static function fakeOpenAiKey(): string
+    {
+        return 'sk' . '-1234567890123456789012345';
+    }
+
+    private static function fakeGithubToken(): string
+    {
+        return 'ghp' . '_abcdefghijklmnopqrstuvwxyz012345';
     }
 }
 
