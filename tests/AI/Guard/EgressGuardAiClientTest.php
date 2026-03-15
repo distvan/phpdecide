@@ -117,6 +117,47 @@ final class EgressGuardAiClientTest extends TestCase
         self::assertNotEmpty($audit->events);
         self::assertSame('phpdecide.ai_guard.input_findings', $audit->events[0]['type']);
         self::assertSame('system_prompt', $audit->events[0]['details']['source'] ?? null);
+        self::assertSame('monitor', $audit->events[0]['details']['action'] ?? null);
+    }
+
+    public function testSystemPromptFindingsLogEffectiveBlockActionWhenInputActionIsSanitize(): void
+    {
+        $inner = new FakeAiClient('ok');
+
+        $policy = new GuardPolicy(
+            id: 't',
+            version: 'v',
+            failureMode: 'fail_closed',
+            inputMaxChars: 8000,
+            dlpEnabled: true,
+            inputDlpAction: 'sanitize',
+            outputDlpAction: 'sanitize',
+            auditLogPrompt: 'redact',
+            auditLogResponse: 'redact',
+            auditEnabled: true,
+        );
+
+        $audit = new SpyAuditLogger();
+        $guard = new EgressGuardAiClient(
+            inner: $inner,
+            policy: $policy,
+            dlpScanner: new DlpScanner(),
+            auditLogger: $audit,
+            systemPromptOverride: 'Use this key: ' . self::fakeOpenAiKey(),
+        );
+
+        $this->expectException(AiClientException::class);
+        $this->expectExceptionMessage('sensitive data detected in system prompt');
+
+        try {
+            $guard->explainDecision('Q', []);
+        } finally {
+            self::assertSame(0, $inner->calls);
+            self::assertNotEmpty($audit->events);
+            self::assertSame('phpdecide.ai_guard.input_findings', $audit->events[0]['type']);
+            self::assertSame('system_prompt', $audit->events[0]['details']['source'] ?? null);
+            self::assertSame('block', $audit->events[0]['details']['action'] ?? null);
+        }
     }
 
     public function testSanitizesQuestionWhenConfigured(): void

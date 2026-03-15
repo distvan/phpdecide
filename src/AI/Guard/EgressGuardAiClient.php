@@ -176,15 +176,16 @@ final class EgressGuardAiClient implements AiClient
             return;
         }
 
-        $action = $this->policy->inputDlpAction;
+        $configuredAction = $this->policy->inputDlpAction;
+        $effectiveAction = $configuredAction === 'monitor' ? 'monitor' : 'block';
 
         $this->audit('input_findings', $correlationId, [
             'source' => 'system_prompt',
             'findings' => $this->findingsToArray($findings),
-            'action' => $action,
+            'action' => $effectiveAction,
         ]);
 
-        if ($action === 'monitor') {
+        if ($effectiveAction === 'monitor') {
             return;
         }
 
