@@ -223,7 +223,7 @@ final class EgressGuardAiClientTest extends TestCase
         self::assertNotNull($question, 'Could not construct a redaction-expanding test fixture.');
         self::assertIsInt($inputCharsBefore);
         self::assertIsInt($inputCharsAfter);
-        self::assertGreaterThan($inputCharsBefore, $inputCharsAfter);
+        self::assertGreaterThan($inputCharsBefore, $inputCharsAfter, 'Sanitized input should be longer than original.');
 
         $policy = new GuardPolicy(
             id: 't',

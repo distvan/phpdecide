@@ -46,7 +46,7 @@ final class DlpScanner
 
         $findings = [];
         foreach ($this->rules() as $rule) {
-            if (@preg_match($rule['pattern'], $text) !== 1) {
+            if (!$this->patternMatches($rule['pattern'], $text)) {
                 continue;
             }
 
@@ -74,9 +74,34 @@ final class DlpScanner
         $out = $text;
         foreach ($this->rules() as $rule) {
             $replacement = '[REDACTED:' . strtoupper($rule['id']) . ']';
-            $out = preg_replace($rule['pattern'], $replacement, $out) ?? $out;
+            $replaced = preg_replace($rule['pattern'], $replacement, $out);
+            if ($replaced === null) {
+                throw new DlpScannerException("DlpScanner redaction failed due to a PCRE error.");
+            }
+            $out = $replaced;
         }
 
         return $out;
+    }
+
+    private function patternMatches(string $pattern, string $text): bool
+    {
+        $hadWarning = false;
+
+        set_error_handler(
+            static function (int $_) use (&$hadWarning): bool {
+                $hadWarning = true;
+                return true;
+            },
+            E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE
+        );
+
+        try {
+            $matched = preg_match($pattern, $text);
+        } finally {
+            restore_error_handler();
+        }
+
+        return $hadWarning === false && $matched === 1;
     }
 }

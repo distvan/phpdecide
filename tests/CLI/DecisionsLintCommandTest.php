@@ -24,7 +24,9 @@ final class DecisionsLintCommandTest extends TestCase
     protected function tearDown(): void
     {
         if ($this->originalCwd !== null) {
-            @chdir($this->originalCwd);
+            if (is_dir($this->originalCwd)) {
+                chdir($this->originalCwd);
+            }
             $this->originalCwd = null;
         }
 
