@@ -16,6 +16,7 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 - `decisions:lint` now catches unexpected runtime errors during YAML parsing/decision validation and reports them as lint failures instead of crashing.
 - Decision cache hardening: cache format switched from PHP serialization to JSON (removes `unserialize()` usage) and cache reads now enforce a max cache size limit.
 - AI HTTP client now explicitly disables redirect following for defense-in-depth.
+- AI explain prompt assembly is now centralized in `ExplainPromptBuilder`, and the egress guard uses that same canonical prompt content so input-size limits account for the full outbound prompt, including wrapper text and any configured system prompt override.
 
 ## [1.1.0] - 2026-02-21
 

@@ -157,7 +157,7 @@ final class EgressGuardAiClientTest extends TestCase
         }
     }
 
-    public function testBlocksWhenInputExceedsMaxChars(): void
+    public function testBlocksWhenEffectivePromptExceedsMaxChars(): void
     {
         $inner = new FakeAiClient('ok');
 
@@ -165,7 +165,7 @@ final class EgressGuardAiClientTest extends TestCase
             id: 't',
             version: 'v',
             failureMode: 'fail_closed',
-            inputMaxChars: 5,
+            inputMaxChars: 4,
             dlpEnabled: false,
             inputDlpAction: 'monitor',
             outputDlpAction: 'sanitize',
@@ -185,7 +185,7 @@ final class EgressGuardAiClientTest extends TestCase
         $this->expectExceptionMessage('input too large');
 
         try {
-            $guard->explainDecision('this is too long', []);
+            $guard->explainDecision('Q', []);
         } finally {
             self::assertSame(0, $inner->calls);
         }

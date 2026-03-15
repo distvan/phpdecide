@@ -102,7 +102,7 @@ final class DecisionFactory
             'rationale',
         ]);
 
-        if(!is_array($data['rationale'])) {
+        if (!is_array($data['rationale'])) {
             throw new InvalidArgumentException("Decision rationale must be an array.");
         }
 

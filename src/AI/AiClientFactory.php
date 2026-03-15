@@ -55,6 +55,7 @@ final class AiClientFactory
             policy: $policy,
             auditLogger: $auditLogger,
             routeId: 'cli:explain',
+            systemPromptOverride: $config->systemPromptOverride,
         );
     }
 }

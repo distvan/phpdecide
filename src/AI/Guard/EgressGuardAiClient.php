@@ -7,6 +7,7 @@ namespace PhpDecide\AI\Guard;
 use PhpDecide\AI\AiClient;
 use PhpDecide\AI\AiClientException;
 use PhpDecide\AI\DecisionPayloadNormalizer;
+use PhpDecide\AI\ExplainPromptBuilder;
 use PhpDecide\Decision\Decision;
 
 /**
@@ -21,6 +22,7 @@ final class EgressGuardAiClient implements AiClient
         private readonly DlpScanner $dlpScanner = new DlpScanner(),
         private readonly AuditLogger $auditLogger = new NullAuditLogger(),
         private readonly string $routeId = 'cli:explain',
+        private readonly ?string $systemPromptOverride = null,
     ) {
     }
 
@@ -117,7 +119,11 @@ final class EgressGuardAiClient implements AiClient
 
     private function inputChars(string $question, string $decisionJson): int
     {
-        return mb_strlen($question . "\n" . $decisionJson);
+        return ExplainPromptBuilder::inputCharsFromDecisionPayloadJson(
+            $question,
+            $decisionJson,
+            $this->systemPromptOverride,
+        );
     }
 
     private function enforceInputSizeLimit(string $correlationId, int $inputChars): void
