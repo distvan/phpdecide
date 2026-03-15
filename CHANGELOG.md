@@ -15,8 +15,10 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 - Decision parsing/validation is now more defensive against malformed YAML types (e.g. non-string `id`, invalid `scope.type`, non-array list fields), raising clear `InvalidArgumentException` errors instead of leaking PHP `TypeError`.
 - `decisions:lint` now catches unexpected runtime errors during YAML parsing/decision validation and reports them as lint failures instead of crashing.
 - Decision cache hardening: cache format switched from PHP serialization to JSON (removes `unserialize()` usage) and cache reads now enforce a max cache size limit.
+- Decision cache writes now also skip oversized JSON payloads, avoiding repeated rewrite/read-miss churn when the cache would exceed the configured size limit.
 - AI HTTP client now explicitly disables redirect following for defense-in-depth.
 - AI explain prompt assembly is now centralized in `ExplainPromptBuilder`, and the egress guard uses that same canonical prompt content so input-size limits account for the full outbound prompt, including wrapper text and any configured system prompt override.
+- AI egress guard DLP checks now also scan the effective system prompt, including any configured system prompt override, to prevent secrets from bypassing guard checks through prompt overrides.
 
 ## [1.1.0] - 2026-02-21
 

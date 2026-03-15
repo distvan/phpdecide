@@ -32,18 +32,20 @@ final class EgressGuardAiClient implements AiClient
     public function explainDecision(string $question, array $decisions): string
     {
         $correlationId = self::newCorrelationId();
+        $originalQuestion = $question;
+        $questionForInner = $question;
         $skipOutputGuard = false;
 
         try {
             $decisionJson = $this->buildDecisionPayloadJson($decisions, $correlationId);
-            $inputChars = $this->inputChars($question, $decisionJson);
+            $inputChars = $this->inputChars($questionForInner, $decisionJson);
 
             $this->enforceInputSizeLimit($correlationId, $inputChars);
 
             if ($this->policy->dlpEnabled) {
                 $this->enforceSystemPromptDlpPolicy($correlationId);
                 $this->enforceNoSensitiveDataInDecisions($correlationId, $decisionJson);
-                $question = $this->applyQuestionDlpPolicy($correlationId, $question);
+                $questionForInner = $this->applyQuestionDlpPolicy($correlationId, $questionForInner);
             }
 
             $this->audit('allow', $correlationId, [
@@ -59,11 +61,12 @@ final class EgressGuardAiClient implements AiClient
             $this->handleGuardInternalFailure($correlationId, $e);
 
             // fail_open: call provider without guard interference.
+            $questionForInner = $originalQuestion;
             $skipOutputGuard = true;
         }
 
         // Inner client failures are not guard failures. Bubble them as-is.
-        $out = $this->inner->explainDecision($question, $decisions);
+        $out = $this->inner->explainDecision($questionForInner, $decisions);
 
         if ($this->policy->dlpEnabled && !$skipOutputGuard) {
             try {

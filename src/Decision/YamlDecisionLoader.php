@@ -17,13 +17,25 @@ final class YamlDecisionLoader implements DecisionLoader
 
     private string $directory;
     private ?string $cacheFile;
+    private int $maxCacheBytes;
     
-    public function __construct(string $directory, ?string $cacheFile = null, bool $enableCache = true)
+    public function __construct(
+        string $directory,
+        ?string $cacheFile = null,
+        bool $enableCache = true,
+        int $maxCacheBytes = self::MAX_CACHE_BYTES,
+    )
     {
         if(!is_dir($directory)) {
             throw new InvalidArgumentException("The provided path is not a directory: {$directory}");
         }
+
+        if ($maxCacheBytes < 1) {
+            throw new InvalidArgumentException('Max cache bytes must be a positive integer.');
+        }
+
         $this->directory = rtrim($directory, DIRECTORY_SEPARATOR);
+        $this->maxCacheBytes = $maxCacheBytes;
 
         if (!$enableCache) {
             $this->cacheFile = null;
@@ -135,7 +147,7 @@ final class YamlDecisionLoader implements DecisionLoader
         $payload = null;
 
         $size = $this->safeFileSize($this->cacheFile);
-        if ($size !== null && $size <= self::MAX_CACHE_BYTES) {
+        if ($size !== null && $size <= $this->maxCacheBytes) {
             $raw = $this->safeReadFile($this->cacheFile);
             if ($raw !== null && $raw !== '') {
                 $payload = $this->safeJsonDecode($raw);
@@ -212,7 +224,7 @@ final class YamlDecisionLoader implements DecisionLoader
             return;
         }
 
-        if (strlen($json) > self::MAX_CACHE_BYTES) {
+        if (strlen($json) > $this->maxCacheBytes) {
             return;
         }
 

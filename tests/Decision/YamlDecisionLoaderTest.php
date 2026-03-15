@@ -95,32 +95,16 @@ final class YamlDecisionLoaderTest extends TestCase
     public function testLoadSkipsWritingCacheWhenPayloadExceedsMaxCacheBytes(): void
     {
         $dir = $this->createTempDir();
-        $file = $dir . DIRECTORY_SEPARATOR . 'DEC-0001.yaml';
-        file_put_contents($file, $this->validDecisionYaml('DEC-0001', 'First decision'));
+        for ($index = 1; $index <= 2; $index++) {
+            $id = sprintf('DEC-%04d', $index);
+            $path = $dir . DIRECTORY_SEPARATOR . $id . '.yaml';
+            file_put_contents($path, $this->validLargeDecisionYaml($id, 'Large decision ' . $index, 20));
+        }
 
-        $loader = new YamlDecisionLoader($dir);
+        $loader = new YamlDecisionLoader($dir, maxCacheBytes: 512);
+        $decisions = iterator_to_array($loader->load(), false);
 
-        $signatureMethod = new \ReflectionMethod(YamlDecisionLoader::class, 'buildSignature');
-
-        /** @var list<array{path: string, mtime: int, size: int}> $signature */
-        $signature = $signatureMethod->invoke($loader, [$file]);
-
-        $oversizedDecisionData = [
-            [
-                'id' => 'DEC-0001',
-                'title' => 'Oversized cache payload',
-                'status' => 'active',
-                'date' => '2026-02-03',
-                'scope' => ['type' => 'global'],
-                'decision' => [
-                    'summary' => str_repeat('x', 5_100_000),
-                    'rationale' => ['Because test payload should exceed max cache size.'],
-                ],
-            ],
-        ];
-
-        $writeMethod = new \ReflectionMethod(YamlDecisionLoader::class, 'tryWriteCache');
-        $writeMethod->invoke($loader, $signature, $oversizedDecisionData);
+        self::assertCount(2, $decisions);
 
         $cacheFile = $dir . DIRECTORY_SEPARATOR . '.phpdecide-decisions.cache';
         self::assertFileDoesNotExist($cacheFile);
@@ -150,6 +134,24 @@ decision:
   summary: Summary for {$id}
   rationale:
     - Because it helps.
+YAML;
+    }
+
+    private function validLargeDecisionYaml(string $id, string $title, int $rationaleItems): string
+    {
+        $rationaleLines = implode("\n", array_fill(0, $rationaleItems, '    - ' . str_repeat('x', 48)));
+
+        return <<<YAML
+id: {$id}
+title: {$title}
+status: active
+date: '2026-02-03'
+scope:
+  type: global
+decision:
+  summary: Large cached payload candidate
+  rationale:
+{$rationaleLines}
 YAML;
     }
 

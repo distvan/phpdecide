@@ -417,6 +417,37 @@ final class EgressGuardAiClientTest extends TestCase
         self::assertSame(1, $inner->calls);
     }
 
+    public function testFailOpenResetsQuestionAfterSanitizeWhenLaterGuardStepFails(): void
+    {
+        $inner = new FakeAiClient('ok-after-fallback');
+        $question = 'Token ' . self::fakeOpenAiKey();
+
+        $policy = new GuardPolicy(
+            id: 't',
+            version: 'v',
+            failureMode: 'fail_open',
+            inputMaxChars: 8000,
+            dlpEnabled: true,
+            inputDlpAction: 'sanitize',
+            outputDlpAction: 'monitor',
+            auditLogPrompt: 'redact',
+            auditLogResponse: 'redact',
+            auditEnabled: true,
+        );
+
+        $guard = new EgressGuardAiClient(
+            inner: $inner,
+            policy: $policy,
+            dlpScanner: new DlpScanner(),
+            auditLogger: new ThrowOnNthAuditLogger(2, new \RuntimeException('audit sink crash')),
+        );
+
+        self::assertSame('ok-after-fallback', $guard->explainDecision($question, []));
+        self::assertSame(1, $inner->calls);
+        self::assertSame($question, $inner->lastQuestion);
+        self::assertStringContainsString(self::fakeOpenAiKey(), $inner->lastQuestion ?? '');
+    }
+
     public function testInnerRuntimeErrorInFailOpenBubblesWithoutRetry(): void
     {
         $inner = new ThrowOnceThenReturnAiClient(new \RuntimeException('provider crash'), 'ok-after-fallback');
@@ -504,6 +535,24 @@ final class ThrowingAuditLogger implements AuditLogger
     public function log(array $event): void
     {
         throw $this->throwable;
+    }
+}
+
+final class ThrowOnNthAuditLogger implements AuditLogger
+{
+    private int $calls = 0;
+
+    public function __construct(private readonly int $throwOnCall, private readonly \Throwable $throwable)
+    {
+    }
+
+    public function log(array $event): void
+    {
+        $this->calls++;
+
+        if ($this->calls === $this->throwOnCall) {
+            throw $this->throwable;
+        }
     }
 }
 
