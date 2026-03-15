@@ -6,6 +6,7 @@ namespace PhpDecide\Tests\AI\Guard;
 
 use PhpDecide\AI\AiClient;
 use PhpDecide\AI\AiClientException;
+use PhpDecide\AI\ExplainPromptBuilder;
 use PhpDecide\AI\Guard\AuditLogger;
 use PhpDecide\AI\Guard\DlpScanner;
 use PhpDecide\AI\Guard\EgressGuardAiClient;
@@ -190,6 +191,48 @@ final class EgressGuardAiClientTest extends TestCase
         self::assertIsString($inner->lastQuestion);
         self::assertStringNotContainsString(self::fakeOpenAiKey(), $inner->lastQuestion);
         self::assertStringContainsString('[REDACTED:DLP.OPENAI_API_KEY]', $inner->lastQuestion);
+    }
+
+    public function testBlocksWhenSanitizationMakesEffectiveInputExceedMaxChars(): void
+    {
+        $inner = new FakeAiClient('ok');
+        $scanner = new DlpScanner();
+
+        $question = 'Token ' . self::fakeOpenAiKey();
+        $sanitizedQuestion = $scanner->redact($question);
+
+        $inputCharsBefore = ExplainPromptBuilder::inputCharsFromDecisionPayloadJson($question, '[]', null);
+        $inputCharsAfter = ExplainPromptBuilder::inputCharsFromDecisionPayloadJson($sanitizedQuestion, '[]', null);
+        self::assertGreaterThan($inputCharsBefore, $inputCharsAfter);
+
+        $policy = new GuardPolicy(
+            id: 't',
+            version: 'v',
+            failureMode: 'fail_closed',
+            inputMaxChars: $inputCharsBefore,
+            dlpEnabled: true,
+            inputDlpAction: 'sanitize',
+            outputDlpAction: 'sanitize',
+            auditLogPrompt: 'redact',
+            auditLogResponse: 'redact',
+            auditEnabled: false,
+        );
+
+        $guard = new EgressGuardAiClient(
+            inner: $inner,
+            policy: $policy,
+            dlpScanner: $scanner,
+            auditLogger: new NullAuditLogger(),
+        );
+
+        $this->expectException(AiClientException::class);
+        $this->expectExceptionMessage('input too large');
+
+        try {
+            $guard->explainDecision($question, []);
+        } finally {
+            self::assertSame(0, $inner->calls);
+        }
     }
 
     public function testRedactsOutputWhenConfigured(): void

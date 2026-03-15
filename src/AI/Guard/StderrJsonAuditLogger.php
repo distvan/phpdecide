@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpDecide\AI\Guard;
 
+use SebastianBergmann\CodeCoverage\Report\PHP;
+
 final class StderrJsonAuditLogger implements AuditLogger
 {
     public function log(array $event): void
@@ -16,7 +18,6 @@ final class StderrJsonAuditLogger implements AuditLogger
             return;
         }
 
-        // error_log writes to stderr in CLI by default.
-        error_log($line);
+        fwrite(STDERR, $line . PHP_EOL);
     }
 }
