@@ -92,6 +92,24 @@ final class YamlDecisionLoaderTest extends TestCase
         self::assertSame('DEC-0001', $second[0]->id()->value());
     }
 
+    public function testLoadSkipsWritingCacheWhenPayloadExceedsMaxCacheBytes(): void
+    {
+        $dir = $this->createTempDir();
+        for ($index = 1; $index <= 2; $index++) {
+            $id = sprintf('DEC-%04d', $index);
+            $path = $dir . DIRECTORY_SEPARATOR . $id . '.yaml';
+            file_put_contents($path, $this->validLargeDecisionYaml($id, 'Large decision ' . $index, 20));
+        }
+
+        $loader = new YamlDecisionLoader($dir, maxCacheBytes: 512);
+        $decisions = iterator_to_array($loader->load(), false);
+
+        self::assertCount(2, $decisions);
+
+        $cacheFile = $dir . DIRECTORY_SEPARATOR . '.phpdecide-decisions.cache';
+        self::assertFileDoesNotExist($cacheFile);
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->tempDirs as $dir) {
@@ -116,6 +134,24 @@ decision:
   summary: Summary for {$id}
   rationale:
     - Because it helps.
+YAML;
+    }
+
+    private function validLargeDecisionYaml(string $id, string $title, int $rationaleItems): string
+    {
+        $rationaleLines = implode("\n", array_fill(0, $rationaleItems, '    - ' . str_repeat('x', 48)));
+
+        return <<<YAML
+id: {$id}
+title: {$title}
+status: active
+date: '2026-02-03'
+scope:
+  type: global
+decision:
+  summary: Large cached payload candidate
+  rationale:
+{$rationaleLines}
 YAML;
     }
 
