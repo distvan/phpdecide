@@ -41,6 +41,7 @@ final class EgressGuardAiClient implements AiClient
             $this->enforceInputSizeLimit($correlationId, $inputChars);
 
             if ($this->policy->dlpEnabled) {
+                $this->enforceSystemPromptDlpPolicy($correlationId);
                 $this->enforceNoSensitiveDataInDecisions($correlationId, $decisionJson);
                 $question = $this->applyQuestionDlpPolicy($correlationId, $question);
             }
@@ -161,6 +162,34 @@ final class EgressGuardAiClient implements AiClient
         throw new AiClientException(
             'AI request blocked by egress guard (sensitive data detected in recorded decisions payload). ' .
             'CorrelationId: ' . $correlationId
+        );
+    }
+
+    private function enforceSystemPromptDlpPolicy(string $correlationId): void
+    {
+        $systemPrompt = ExplainPromptBuilder::systemPrompt($this->systemPromptOverride);
+        $findings = $this->dlpScanner->scan($systemPrompt);
+        if ($findings === []) {
+            return;
+        }
+
+        $action = $this->policy->inputDlpAction;
+
+        $this->audit('input_findings', $correlationId, [
+            'source' => 'system_prompt',
+            'findings' => $this->findingsToArray($findings),
+            'action' => $action,
+        ]);
+
+        if ($action === 'monitor') {
+            return;
+        }
+
+        // Prompt override text cannot be safely redacted in this guard layer because the
+        // wrapped provider client owns prompt assembly and egress. Treat findings as block.
+        throw new AiClientException(
+            'AI request blocked by egress guard (sensitive data detected in system prompt). CorrelationId: ' .
+            $correlationId
         );
     }
 

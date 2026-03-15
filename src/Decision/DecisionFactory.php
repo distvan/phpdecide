@@ -179,7 +179,7 @@ final class DecisionFactory
         );
     }
 
-    private static function references(?array $data): References
+    private static function references(array $data): References
     {
         $issues = $data['issues'] ?? [];
         $commits = $data['commits'] ?? [];

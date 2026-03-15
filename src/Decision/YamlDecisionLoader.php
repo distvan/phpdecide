@@ -212,6 +212,10 @@ final class YamlDecisionLoader implements DecisionLoader
             return;
         }
 
+        if (strlen($json) > self::MAX_CACHE_BYTES) {
+            return;
+        }
+
         $this->safeWriteFile($this->cacheFile, $json);
     }
 

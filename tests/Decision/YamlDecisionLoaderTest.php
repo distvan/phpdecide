@@ -92,6 +92,40 @@ final class YamlDecisionLoaderTest extends TestCase
         self::assertSame('DEC-0001', $second[0]->id()->value());
     }
 
+        public function testLoadSkipsWritingCacheWhenPayloadExceedsMaxCacheBytes(): void
+        {
+                $dir = $this->createTempDir();
+            $file = $dir . DIRECTORY_SEPARATOR . 'DEC-0001.yaml';
+            file_put_contents($file, $this->validDecisionYaml('DEC-0001', 'First decision'));
+
+            $loader = new YamlDecisionLoader($dir);
+
+            $signatureMethod = new \ReflectionMethod(YamlDecisionLoader::class, 'buildSignature');
+
+            /** @var list<array{path: string, mtime: int, size: int}> $signature */
+            $signature = $signatureMethod->invoke($loader, [$file]);
+
+            $oversizedDecisionData = [
+                [
+                    'id' => 'DEC-0001',
+                    'title' => 'Oversized cache payload',
+                    'status' => 'active',
+                    'date' => '2026-02-03',
+                    'scope' => ['type' => 'global'],
+                    'decision' => [
+                        'summary' => str_repeat('x', 5_100_000),
+                        'rationale' => ['Because test payload should exceed max cache size.'],
+                    ],
+                ],
+            ];
+
+            $writeMethod = new \ReflectionMethod(YamlDecisionLoader::class, 'tryWriteCache');
+            $writeMethod->invoke($loader, $signature, $oversizedDecisionData);
+
+                $cacheFile = $dir . DIRECTORY_SEPARATOR . '.phpdecide-decisions.cache';
+                self::assertFileDoesNotExist($cacheFile);
+        }
+
     protected function tearDown(): void
     {
         foreach ($this->tempDirs as $dir) {

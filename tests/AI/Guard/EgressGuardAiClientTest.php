@@ -50,6 +50,75 @@ final class EgressGuardAiClientTest extends TestCase
         }
     }
 
+    public function testBlocksWhenSecretDetectedInSystemPromptOverride(): void
+    {
+        $inner = new FakeAiClient('ok');
+
+        $policy = new GuardPolicy(
+            id: 't',
+            version: 'v',
+            failureMode: 'fail_closed',
+            inputMaxChars: 8000,
+            dlpEnabled: true,
+            inputDlpAction: 'block',
+            outputDlpAction: 'sanitize',
+            auditLogPrompt: 'redact',
+            auditLogResponse: 'redact',
+            auditEnabled: false,
+        );
+
+        $guard = new EgressGuardAiClient(
+            inner: $inner,
+            policy: $policy,
+            dlpScanner: new DlpScanner(),
+            auditLogger: new NullAuditLogger(),
+            systemPromptOverride: 'Use this key: ' . self::fakeOpenAiKey(),
+        );
+
+        $this->expectException(AiClientException::class);
+        $this->expectExceptionMessage('sensitive data detected in system prompt');
+
+        try {
+            $guard->explainDecision('Q', []);
+        } finally {
+            self::assertSame(0, $inner->calls);
+        }
+    }
+
+    public function testMonitorActionAllowsSystemPromptOverrideFindings(): void
+    {
+        $inner = new FakeAiClient('ok');
+
+        $policy = new GuardPolicy(
+            id: 't',
+            version: 'v',
+            failureMode: 'fail_closed',
+            inputMaxChars: 8000,
+            dlpEnabled: true,
+            inputDlpAction: 'monitor',
+            outputDlpAction: 'sanitize',
+            auditLogPrompt: 'redact',
+            auditLogResponse: 'redact',
+            auditEnabled: true,
+        );
+
+        $audit = new SpyAuditLogger();
+        $guard = new EgressGuardAiClient(
+            inner: $inner,
+            policy: $policy,
+            dlpScanner: new DlpScanner(),
+            auditLogger: $audit,
+            systemPromptOverride: 'Use this key: ' . self::fakeOpenAiKey(),
+        );
+
+        self::assertSame('ok', $guard->explainDecision('Q', []));
+        self::assertSame(1, $inner->calls);
+
+        self::assertNotEmpty($audit->events);
+        self::assertSame('phpdecide.ai_guard.input_findings', $audit->events[0]['type']);
+        self::assertSame('system_prompt', $audit->events[0]['details']['source'] ?? null);
+    }
+
     public function testSanitizesQuestionWhenConfigured(): void
     {
         $inner = new FakeAiClient('ok');
