@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PhpDecide\AI\Guard;
 
-use SebastianBergmann\CodeCoverage\Report\PHP;
 
 final class StderrJsonAuditLogger implements AuditLogger
 {

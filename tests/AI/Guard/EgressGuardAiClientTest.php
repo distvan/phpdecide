@@ -41,11 +41,11 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: new NullAuditLogger(),
         );
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('blocked by egress guard');
-
         try {
             $guard->explainDecision('My key is ' . self::fakeOpenAiKey(), []);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('blocked by egress guard', $e->getMessage());
         } finally {
             self::assertSame(0, $inner->calls);
         }
@@ -76,11 +76,11 @@ final class EgressGuardAiClientTest extends TestCase
             systemPromptOverride: 'Use this key: ' . self::fakeOpenAiKey(),
         );
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('sensitive data detected in system prompt');
-
         try {
             $guard->explainDecision('Q', []);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('sensitive data detected in system prompt', $e->getMessage());
         } finally {
             self::assertSame(0, $inner->calls);
         }
@@ -147,11 +147,11 @@ final class EgressGuardAiClientTest extends TestCase
             systemPromptOverride: 'Use this key: ' . self::fakeOpenAiKey(),
         );
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('sensitive data detected in system prompt');
-
         try {
             $guard->explainDecision('Q', []);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('sensitive data detected in system prompt', $e->getMessage());
         } finally {
             self::assertSame(0, $inner->calls);
             self::assertNotEmpty($audit->events);
@@ -225,11 +225,11 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: new NullAuditLogger(),
         );
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('input too large');
-
         try {
             $guard->explainDecision($question, []);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('input too large', $e->getMessage());
         } finally {
             self::assertSame(0, $inner->calls);
         }
@@ -300,11 +300,11 @@ final class EgressGuardAiClientTest extends TestCase
             ],
         ]);
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('sensitive data detected in recorded decisions payload');
-
         try {
             $guard->explainDecision('Q', [$decision]);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('sensitive data detected in recorded decisions payload', $e->getMessage());
         } finally {
             self::assertSame(0, $inner->calls);
         }
@@ -334,11 +334,11 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: new NullAuditLogger(),
         );
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('input too large');
-
         try {
             $guard->explainDecision('Q', []);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('input too large', $e->getMessage());
         } finally {
             self::assertSame(0, $inner->calls);
         }
@@ -368,10 +368,12 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: new NullAuditLogger(),
         );
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('AI response blocked by egress guard');
-
-        $guard->explainDecision('Q', []);
+        try {
+            $guard->explainDecision('Q', []);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('AI response blocked by egress guard', $e->getMessage());
+        }
     }
 
     public function testMonitorActionsDoNotModifyInputOrOutputButWriteAuditEvents(): void
@@ -463,11 +465,11 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: new ThrowingAuditLogger(new \RuntimeException('audit sink crash')),
         );
 
-        $this->expectException(AiClientException::class);
-        $this->expectExceptionMessage('internal error');
-
         try {
             $guard->explainDecision('Q', []);
+            self::fail('Expected AiClientException was not thrown.');
+        } catch (AiClientException $e) {
+            self::assertStringContainsString('internal error', $e->getMessage());
         } finally {
             self::assertSame(0, $inner->calls);
         }
