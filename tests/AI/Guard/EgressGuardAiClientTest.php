@@ -286,9 +286,9 @@ final class EgressGuardAiClientTest extends TestCase
         self::assertCount(0, $audit->events);
     }
 
-    public function testInternalErrorInFailClosedIsWrappedAsGuardBlock(): void
+    public function testGuardInternalErrorInFailClosedIsWrappedAsGuardBlock(): void
     {
-        $inner = new ThrowingAiClient(new \RuntimeException('provider crash'));
+        $inner = new FakeAiClient('ok');
 
         $policy = new GuardPolicy(
             id: 't',
@@ -300,14 +300,14 @@ final class EgressGuardAiClientTest extends TestCase
             outputDlpAction: 'monitor',
             auditLogPrompt: 'redact',
             auditLogResponse: 'redact',
-            auditEnabled: false,
+            auditEnabled: true,
         );
 
         $guard = new EgressGuardAiClient(
             inner: $inner,
             policy: $policy,
             dlpScanner: new DlpScanner(),
-            auditLogger: new NullAuditLogger(),
+            auditLogger: new ThrowingAuditLogger(new \RuntimeException('audit sink crash')),
         );
 
         $this->expectException(AiClientException::class);
@@ -316,11 +316,39 @@ final class EgressGuardAiClientTest extends TestCase
         try {
             $guard->explainDecision('Q', []);
         } finally {
-            self::assertSame(1, $inner->calls);
+            self::assertSame(0, $inner->calls);
         }
     }
 
-    public function testInternalErrorInFailOpenFallsBackToInnerClient(): void
+    public function testGuardInternalErrorInFailOpenFallsBackToInnerClient(): void
+    {
+        $inner = new FakeAiClient('ok-after-fallback');
+
+        $policy = new GuardPolicy(
+            id: 't',
+            version: 'v',
+            failureMode: 'fail_open',
+            inputMaxChars: 8000,
+            dlpEnabled: false,
+            inputDlpAction: 'monitor',
+            outputDlpAction: 'monitor',
+            auditLogPrompt: 'redact',
+            auditLogResponse: 'redact',
+            auditEnabled: true,
+        );
+
+        $guard = new EgressGuardAiClient(
+            inner: $inner,
+            policy: $policy,
+            dlpScanner: new DlpScanner(),
+            auditLogger: new ThrowingAuditLogger(new \RuntimeException('audit sink crash')),
+        );
+
+        self::assertSame('ok-after-fallback', $guard->explainDecision('Q', []));
+        self::assertSame(1, $inner->calls);
+    }
+
+    public function testInnerRuntimeErrorInFailOpenBubblesWithoutRetry(): void
     {
         $inner = new ThrowOnceThenReturnAiClient(new \RuntimeException('provider crash'), 'ok-after-fallback');
 
@@ -344,8 +372,14 @@ final class EgressGuardAiClientTest extends TestCase
             auditLogger: new NullAuditLogger(),
         );
 
-        self::assertSame('ok-after-fallback', $guard->explainDecision('Q', []));
-        self::assertSame(2, $inner->calls);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('provider crash');
+
+        try {
+            $guard->explainDecision('Q', []);
+        } finally {
+            self::assertSame(1, $inner->calls);
+        }
     }
 
     private static function fakeOpenAiKey(): string
@@ -392,17 +426,14 @@ final class SpyAuditLogger implements AuditLogger
     }
 }
 
-final class ThrowingAiClient implements AiClient
+final class ThrowingAuditLogger implements AuditLogger
 {
-    public int $calls = 0;
-
     public function __construct(private readonly \Throwable $throwable)
     {
     }
 
-    public function explainDecision(string $question, array $decisions): string
+    public function log(array $event): void
     {
-        $this->calls++;
         throw $this->throwable;
     }
 }

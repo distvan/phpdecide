@@ -192,15 +192,15 @@ YAML
         self::assertStringContainsString('DEC-0001-scalar.yaml', $tester->getDisplay(true));
     }
 
-        public function testFailsWhenDecisionHasWrongScalarTypes(): void
-        {
-                $projectDir = $this->createTempProjectDir();
-                $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+    public function testFailsWhenDecisionHasWrongScalarTypes(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
 
-                // YAML parses the id as an int; the factory should report it as a validation error.
-                $this->writeFile(
-                        $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-wrong-id-type.yaml',
-                        <<<YAML
+        // YAML parses the id as an int; the factory should report it as a validation error.
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-wrong-id-type.yaml',
+            <<<YAML
 id: 123
 title: Wrong id type
 status: active
@@ -212,18 +212,18 @@ decision:
     rationale:
         - Because.
 YAML
-                );
+            );
 
-                $tester = new CommandTester(new DecisionsLintCommand());
-                $exitCode = $tester->execute(['--dir' => $decisionsDir]);
+        $tester = new CommandTester(new DecisionsLintCommand());
+        $exitCode = $tester->execute(['--dir' => $decisionsDir]);
 
-                self::assertSame(Command::FAILURE, $exitCode);
+        self::assertSame(Command::FAILURE, $exitCode);
 
-                $display = $tester->getDisplay(true);
-                self::assertStringContainsString('Decision lint failed', $display);
-                self::assertStringContainsString('DEC-0001-wrong-id-type.yaml', $display);
-                self::assertStringContainsString("Field 'id' must be a non-empty string", $display);
-        }
+        $display = $tester->getDisplay(true);
+        self::assertStringContainsString('Decision lint failed', $display);
+        self::assertStringContainsString('DEC-0001-wrong-id-type.yaml', $display);
+        self::assertStringContainsString("Field 'id' must be a non-empty string", $display);
+    }
 
     public function testFailsWhenStringListFieldsContainNonStringOrEmptyItems(): void
     {

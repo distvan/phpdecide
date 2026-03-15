@@ -187,6 +187,8 @@ Notes:
 
 - If the guard detects secrets in the **recorded decisions payload**, it blocks the AI call (to avoid leaking decision content).
 - If it detects secrets in the **question**, behavior depends on `PHPDECIDE_AI_GUARD_INPUT_DLP_ACTION`.
+- Audit events never include raw prompt/response fields from this layer.
+- `PHPDECIDE_AI_GUARD_AUDIT_LOG_PROMPT` and `PHPDECIDE_AI_GUARD_AUDIT_LOG_RESPONSE` are currently parsed by config but not applied to runtime audit shaping (reserved for future behavior).
 
 TLS note: if you enable `--ai` and hit TLS/certificate issues, configure `PHPDECIDE_AI_CAINFO` (CA bundle). TLS verification is enforced; there is no insecure/skip-verify mode.
 

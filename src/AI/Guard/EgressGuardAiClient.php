@@ -30,60 +30,71 @@ final class EgressGuardAiClient implements AiClient
     public function explainDecision(string $question, array $decisions): string
     {
         $correlationId = self::newCorrelationId();
+        $skipOutputGuard = false;
 
         try {
-            return $this->guardedExplainDecision($correlationId, $question, $decisions);
+            $decisionJson = $this->buildDecisionPayloadJson($decisions, $correlationId);
+            $inputChars = $this->inputChars($question, $decisionJson);
+
+            $this->enforceInputSizeLimit($correlationId, $inputChars);
+
+            if ($this->policy->dlpEnabled) {
+                $this->enforceNoSensitiveDataInDecisions($correlationId, $decisionJson);
+                $question = $this->applyQuestionDlpPolicy($correlationId, $question);
+            }
+
+            $this->audit('allow', $correlationId, [
+                'policy' => ['id' => $this->policy->id, 'version' => $this->policy->version],
+                'routeId' => $this->routeId,
+                'inputChars' => $inputChars,
+                'dlpEnabled' => $this->policy->dlpEnabled,
+            ]);
         } catch (AiClientException $e) {
             // Expected failures should already include correlationId.
             throw $e;
         } catch (\Throwable $e) {
-            // Guard internal failure (regex/encoding/etc). Apply failure mode.
+            $this->handleGuardInternalFailure($correlationId, $e);
+
+            // fail_open: call provider without guard interference.
+            $skipOutputGuard = true;
+        }
+
+        // Inner client failures are not guard failures. Bubble them as-is.
+        $out = $this->inner->explainDecision($question, $decisions);
+
+        if ($this->policy->dlpEnabled && !$skipOutputGuard) {
+            try {
+                $out = $this->applyOutputDlpPolicy($correlationId, $out);
+            } catch (AiClientException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                $this->handleGuardInternalFailure($correlationId, $e);
+
+                // fail_open: keep provider response without post-processing.
+            }
+        }
+
+        return $out;
+    }
+
+    private function handleGuardInternalFailure(string $correlationId, \Throwable $e): void
+    {
+        // Guard internal failure (regex/encoding/audit/etc). Apply failure mode.
+        try {
             $this->audit('guard_error', $correlationId, [
                 'errorClass' => $e::class,
                 'message' => $e->getMessage(),
             ]);
-
-            if ($this->policy->failureMode === 'fail_closed') {
-                throw new AiClientException(
-                    'AI request blocked by egress guard (internal error). ' .
-                    'CorrelationId: ' . $correlationId
-                );
-            }
-
-            // fail_open: call provider without guard interference.
-            return $this->inner->explainDecision($question, $decisions);
-        }
-    }
-
-    /**
-     * @param Decision[] $decisions
-     */
-    private function guardedExplainDecision(string $correlationId, string $question, array $decisions): string
-    {
-        $decisionJson = $this->buildDecisionPayloadJson($decisions, $correlationId);
-        $inputChars = $this->inputChars($question, $decisionJson);
-
-        $this->enforceInputSizeLimit($correlationId, $inputChars);
-
-        if ($this->policy->dlpEnabled) {
-            $this->enforceNoSensitiveDataInDecisions($correlationId, $decisionJson);
-            $question = $this->applyQuestionDlpPolicy($correlationId, $question);
+        } catch (\Throwable) {
+            // Guard-error auditing must never mask the original failure handling path.
         }
 
-        $this->audit('allow', $correlationId, [
-            'policy' => ['id' => $this->policy->id, 'version' => $this->policy->version],
-            'routeId' => $this->routeId,
-            'inputChars' => $inputChars,
-            'dlpEnabled' => $this->policy->dlpEnabled,
-        ]);
-
-        $out = $this->inner->explainDecision($question, $decisions);
-
-        if ($this->policy->dlpEnabled) {
-            $out = $this->applyOutputDlpPolicy($correlationId, $out);
+        if ($this->policy->failureMode === 'fail_closed') {
+            throw new AiClientException(
+                'AI request blocked by egress guard (internal error). ' .
+                'CorrelationId: ' . $correlationId
+            );
         }
-
-        return $out;
     }
 
     /**
