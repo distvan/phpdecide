@@ -26,7 +26,7 @@ final class YamlDecisionLoader implements DecisionLoader
         int $maxCacheBytes = self::MAX_CACHE_BYTES,
     )
     {
-        if(!is_dir($directory)) {
+        if (!is_dir($directory)) {
             throw new InvalidArgumentException("The provided path is not a directory: {$directory}");
         }
 
@@ -219,7 +219,10 @@ final class YamlDecisionLoader implements DecisionLoader
 
         // Best-effort; cache must never break normal behavior.
         try {
-            $json = json_encode($payload, JSON_THROW_ON_ERROR);
+            $json = json_encode(
+                $payload,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            );
         } catch (\JsonException) {
             return;
         }
