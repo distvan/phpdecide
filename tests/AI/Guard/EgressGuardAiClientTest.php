@@ -198,11 +198,31 @@ final class EgressGuardAiClientTest extends TestCase
         $inner = new FakeAiClient('ok');
         $scanner = new DlpScanner();
 
-        $question = 'Token ' . self::fakeOpenAiKey();
-        $sanitizedQuestion = $scanner->redact($question);
+        $question = null;
+        $inputCharsBefore = null;
+        $inputCharsAfter = null;
 
-        $inputCharsBefore = ExplainPromptBuilder::inputCharsFromDecisionPayloadJson($question, '[]', null);
-        $inputCharsAfter = ExplainPromptBuilder::inputCharsFromDecisionPayloadJson($sanitizedQuestion, '[]', null);
+        // Choose a deterministic fixture where sanitizer expansion can push prompt size over max.
+        for ($len = 8; $len <= 96; $len++) {
+            $candidate = 'Token sk-' . str_repeat('a', $len);
+            $sanitizedCandidate = $scanner->redact($candidate);
+            if ($sanitizedCandidate === $candidate) {
+                continue;
+            }
+
+            $candidateCharsBefore = ExplainPromptBuilder::inputCharsFromDecisionPayloadJson($candidate, '[]', null);
+            $candidateCharsAfter = ExplainPromptBuilder::inputCharsFromDecisionPayloadJson($sanitizedCandidate, '[]', null);
+            if ($candidateCharsAfter > $candidateCharsBefore) {
+                $question = $candidate;
+                $inputCharsBefore = $candidateCharsBefore;
+                $inputCharsAfter = $candidateCharsAfter;
+                break;
+            }
+        }
+
+        self::assertNotNull($question, 'Could not construct a redaction-expanding test fixture.');
+        self::assertIsInt($inputCharsBefore);
+        self::assertIsInt($inputCharsAfter);
         self::assertGreaterThan($inputCharsBefore, $inputCharsAfter);
 
         $policy = new GuardPolicy(
