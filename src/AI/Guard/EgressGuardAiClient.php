@@ -40,8 +40,6 @@ final class EgressGuardAiClient implements AiClient
             $decisionJson = $this->buildDecisionPayloadJson($decisions, $correlationId);
             $inputChars = $this->inputChars($questionForInner, $decisionJson);
 
-            $this->enforceInputSizeLimit($correlationId, $inputChars);
-
             if ($this->policy->dlpEnabled) {
                 $this->enforceSystemPromptDlpPolicy($correlationId);
                 $this->enforceNoSensitiveDataInDecisions($correlationId, $decisionJson);
@@ -49,9 +47,8 @@ final class EgressGuardAiClient implements AiClient
 
                 // Enforce the limit against the final effective input after any guard mutation.
                 $inputChars = $this->inputChars($questionForInner, $decisionJson);
-                $this->enforceInputSizeLimit($correlationId, $inputChars);
             }
-
+            $this->enforceInputSizeLimit($correlationId, $inputChars);
             $this->audit('allow', $correlationId, [
                 'policy' => ['id' => $this->policy->id, 'version' => $this->policy->version],
                 'routeId' => $this->routeId,
