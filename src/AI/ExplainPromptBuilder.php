@@ -22,7 +22,8 @@ final class ExplainPromptBuilder
         string $question,
         string $decisionPayloadJson,
         ?string $systemPromptOverride = null,
-    ): int {
+    ): int
+    {
         return mb_strlen(
             self::systemPrompt($systemPromptOverride)
             . self::userContentFromDecisionPayloadJson($question, $decisionPayloadJson)

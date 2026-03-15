@@ -1,19 +1,18 @@
 @startuml
-' PHPDecide - Class diagram (overview)
-' Includes: Decision domain + Explain + AI + AI Guard + CLI
+' PHPDecide - Diagram 1/2
+' Domain model + Explain + CLI
 
 skinparam shadowing false
 skinparam classAttributeIconSize 0
 skinparam linetype ortho
+left to right direction
 
 set namespaceSeparator ::
 
-title PHPDecide - Class Diagram (src)
+title PHPDecide - Domain and CLI (src)
 
 package PhpDecide::Config {
-  class PhpDecideDefaults {
-    {static} +DECISIONS_DIR: string
-  }
+  class PhpDecideDefaults
 }
 
 package Symfony::Console {
@@ -26,300 +25,44 @@ package Symfony::Yaml {
 }
 
 package PhpDecide::Decision {
-
-  class Decision {
-    +__construct(
-      id: DecisionId,
-      title: string,
-      status: DecisionStatus,
-      date: DateTimeImmutable,
-      scope: Scope,
-      content: DecisionContent,
-      examples: Examples,
-      rules: Rules?,
-      aiMetadata: AiMetadata? = null,
-      references: References? = null
-    )
-    +id(): DecisionId
-    +title(): string
-    +status(): DecisionStatus
-    +isActive(): bool
-    +date(): DateTimeImmutable
-    +scope(): Scope
-    +content(): DecisionContent
-    +examples(): Examples
-    +rules(): Rules?
-    +aiMetadata(): AiMetadata?
-    +references(): References?
-  }
-
-  class DecisionId {
-    +__construct(value: string)
-    +fromString(value: string): DecisionId
-    +value(): string
-    +equals(other: DecisionId): bool
-  }
-
-  enum DecisionStatus {
-    ACTIVE
-    DEPRECATED
-    SUPERSEDED
-    +isActive(): bool
-  }
-
-  class Scope {
-    +__construct(type: ScopeType, paths: array = [])
-    +type(): ScopeType
-    +paths(): array
-    +appliesTo(path: string): bool
-  }
-
-  enum ScopeType {
-    GLOBAL
-    PATH
-    MODULE
-  }
-
-  class DecisionContent {
-    +__construct(summary: string, rationale: array, alternatives: array = [])
-    +summary(): string
-    +rationale(): array
-    +alternatives(): array
-  }
-
-  class Examples {
-    +__construct(allowed: array = [], forbidden: array = [])
-    +allowed(): array
-    +forbidden(): array
-  }
-
-  class Rules {
-    +__construct(forbid: array = [], allow: array = [])
-    +forbid(): array
-    +allow(): array
-    +hasRules(): bool
-  }
-
-  class AiMetadata {
-    +__construct(explainStyle: string, keywords: array = [])
-    +explainStyle(): string
-    +keywords(): array
-  }
-
-  class References {
-    +__construct(issues: array, commits: array, adr: string?)
-    +empty(): References
-    +issues(): array
-    +commits(): array
-    +adr(): string?
-  }
-
-  interface DecisionLoader {
-    +load(): iterable
-  }
-
-  class YamlDecisionLoader {
-    +__construct(directory: string, cacheFile: string? = null, enableCache: bool = true)
-    +load(): iterable
-  }
-
-  class DecisionFileCollector {
-    {static} +collect(dir: string): array
-  }
-
-  interface DecisionRepository {
-    +all(): array
-    +active(): array
-    +findById(id: DecisionId): Decision?
-    +applicableTo(path: string): array
-    +searchByKeyword(keyword: string): array
-  }
-
-  interface SearchIndexedDecisionRepository {
-    +haystackLowerFor(decision: Decision): string
-  }
-
-  class FileDecisionRepository {
-    +__construct(loader: DecisionLoader)
-    +all(): array
-    +active(): array
-    +findById(id: DecisionId): Decision?
-    +applicableTo(path: string): array
-    +searchByKeyword(keyword: string): array
-    +haystackLowerFor(decision: Decision): string
-  }
-
-  class DecisionFactory {
-    {static} +fromArray(data: array): Decision
-  }
-}
-
-package PhpDecide::AI {
-
-  interface AiClient {
-    +explainDecision(question: string, decisions: array): string
-  }
-
-  class AiClientConfig {
-    +__construct(
-      apiKey: string,
-      model: string,
-      baseUrl: string,
-      chatCompletionsPath: string,
-      timeoutSeconds: int,
-      authHeaderName: string,
-      authPrefix: string,
-      organization: string?,
-      project: string?,
-      systemPromptOverride: string?,
-      caInfoPath: string?,
-      insecureSkipVerify: bool
-    )
-    {static} +fromEnvironment(): AiClientConfig?
-  }
-
-  class AiClientFactory {
-    {static} +fromEnvironment(httpClient: PhpDecide::AI::Http::HttpClient? = null): AiClient?
-    {static} +fromConfig(config: AiClientConfig, httpClient: PhpDecide::AI::Http::HttpClient? = null): AiClient
-  }
-
-  class OpenAiChatCompletionsClient {
-    +__construct(
-      apiKey: string,
-      model: string,
-      baseUrl: string = "https://api.openai.com",
-      chatCompletionsPath: string = "/v1/chat/completions",
-      authHeaderName: string = "Authorization",
-      authPrefix: string = "Bearer ",
-      timeoutSeconds: int = 20,
-      organization: string? = null,
-      project: string? = null,
-      systemPromptOverride: string? = null,
-      caInfoPath: string? = null,
-      insecureSkipVerify: bool = false,
-      httpClient: PhpDecide::AI::Http::HttpClient? = null
-    )
-    +explainDecision(question: string, decisions: array): string
-  }
-
-  class DecisionPayloadNormalizer {
-    {static} +decisionToCompactPayload(decision: PhpDecide::Decision::Decision): array
-  }
-
-  class AiClientException
-}
-
-package PhpDecide::AI::Http {
-  interface HttpClient {
-    +post(url: string, headers: array, body: string, timeoutSeconds: int, caInfoPath: string? = null): HttpResponse
-  }
-
-  class HttpResponse {
-    +__construct(statusCode: int, body: string)
-  }
-
-  class CurlHttpClient {
-    +post(url: string, headers: array, body: string, timeoutSeconds: int, caInfoPath: string? = null): HttpResponse
-  }
-}
-
-package PhpDecide::AI::Guard {
-  class EgressGuardAiClient {
-    +__construct(
-      inner: PhpDecide::AI::AiClient,
-      policy: GuardPolicy,
-      dlpScanner: DlpScanner = new DlpScanner(),
-      auditLogger: AuditLogger = new NullAuditLogger(),
-      routeId: string = "cli:explain"
-    )
-    +explainDecision(question: string, decisions: array): string
-  }
-
-  class GuardPolicy {
-    +__construct(
-      id: string,
-      version: string,
-      failureMode: string,
-      inputMaxChars: int,
-      dlpEnabled: bool,
-      inputDlpAction: string,
-      outputDlpAction: string,
-      auditLogPrompt: string,
-      auditLogResponse: string,
-      auditEnabled: bool
-    )
-    {static} +baselineEnterprise(): GuardPolicy
-  }
-
-  class GuardPolicyFactory {
-    {static} +isEnabledFromEnvironment(): bool
-    {static} +fromEnvironment(): GuardPolicy
-  }
-
-  class DlpScanner {
-    +scan(text: string): array
-    +redact(text: string): string
-  }
-
-  class Finding {
-    +__construct(id: string, severity: string, category: string, message: string, evidence: array = [])
-    +toArray(): array
-  }
-
-  interface AuditLogger {
-    +log(event: array): void
-  }
-
-  class NullAuditLogger {
-    +log(event: array): void
-  }
-
-  class StderrJsonAuditLogger {
-    +log(event: array): void
-  }
+  class Decision
+  class DecisionId
+  enum DecisionStatus
+  class Scope
+  enum ScopeType
+  class DecisionContent
+  class Examples
+  class Rules
+  class AiMetadata
+  class References
+  interface DecisionLoader
+  class YamlDecisionLoader
+  class DecisionFileCollector
+  interface DecisionRepository
+  interface SearchIndexedDecisionRepository
+  class FileDecisionRepository
+  class DecisionFactory
 }
 
 package PhpDecide::Explain {
+  interface AiExplainer
+  class AiClientExplainer
+  class ExplainService
+  class DecisionMatcher
+  class Explanation
+}
 
-  interface AiExplainer {
-    +explain(question: string, decisions: array): string
-  }
-
-  class AiClientExplainer {
-    +__construct(client: PhpDecide::AI::AiClient)
-    +explain(question: string, decisions: array): string
-  }
-
-  class ExplainService {
-    +__construct(repository: PhpDecide::Decision::DecisionRepository, aiExplainer: AiExplainer? = null)
-    +explain(question: string, path: string? = null): Explanation
-  }
-
-  class DecisionMatcher {
-    +__construct(repository: PhpDecide::Decision::DecisionRepository)
-    +match(question: string, decisions: iterable? = null): array
-  }
-
-  class Explanation {
-    +__construct(decisions: array, message: string)
-    +decisions(): array
-    +message(): string
-    +hasDecisions(): bool
-  }
+package PhpDecide::AI {
+  interface AiClient <<external>>
+  class AiClientFactory <<external>>
 }
 
 package PhpDecide::CLI {
-
-  class ExplainCommand {
-    +execute(input, output): int
-  }
-
-  class DecisionsLintCommand {
-    +execute(input, output): int
-  }
+  class ExplainCommand
+  class DecisionsLintCommand
 }
 
-' --- Composition / Aggregation relationships ---
+' --- Domain composition ---
 Decision *-- "1" DecisionId : id
 Decision *-- "1" DecisionContent : content
 Decision *-- "1" Examples : examples
@@ -328,40 +71,25 @@ Decision --> "1" DecisionStatus : status
 Decision o-- "0..1" Rules : rules
 Decision o-- "0..1" AiMetadata : aiMetadata
 Decision o-- "0..1" References : references
-
 Scope --> "1" ScopeType : type
 
 ' --- Interfaces / implementations ---
 YamlDecisionLoader ..|> DecisionLoader
 FileDecisionRepository ..|> DecisionRepository
 FileDecisionRepository ..|> SearchIndexedDecisionRepository
-OpenAiChatCompletionsClient ..|> PhpDecide::AI::AiClient
-PhpDecide::AI::Guard::EgressGuardAiClient ..|> PhpDecide::AI::AiClient
-AiClientExplainer ..|> PhpDecide::Explain::AiExplainer
-CurlHttpClient ..|> PhpDecide::AI::Http::HttpClient
-PhpDecide::AI::Guard::NullAuditLogger ..|> PhpDecide::AI::Guard::AuditLogger
-PhpDecide::AI::Guard::StderrJsonAuditLogger ..|> PhpDecide::AI::Guard::AuditLogger
+AiClientExplainer ..|> AiExplainer
 
-' --- Inheritance ---
-PhpDecide::CLI::ExplainCommand --|> Symfony::Console::Command
-PhpDecide::CLI::DecisionsLintCommand --|> Symfony::Console::Command
+' --- CLI inheritance ---
+ExplainCommand --|> Command
+DecisionsLintCommand --|> Command
 
-' --- Dependencies (usage) ---
+' --- Dependencies ---
 YamlDecisionLoader ..> DecisionFileCollector
 FileDecisionRepository ..> DecisionLoader
 FileDecisionRepository ..> Decision
 FileDecisionRepository ..> DecisionId
+
 DecisionFactory ..> Decision
-AiClientFactory ..> AiClientConfig
-AiClientFactory ..> PhpDecide::AI::Http::HttpClient
-AiClientFactory ..> OpenAiChatCompletionsClient
-AiClientFactory ..> PhpDecide::AI::Guard::GuardPolicyFactory
-AiClientFactory ..> PhpDecide::AI::Guard::EgressGuardAiClient
-AiClientFactory ..> PhpDecide::AI::Guard::StderrJsonAuditLogger
-AiClientFactory ..> PhpDecide::AI::Guard::NullAuditLogger
-OpenAiChatCompletionsClient o-- "1" PhpDecide::AI::Http::HttpClient : httpClient
-CurlHttpClient ..> PhpDecide::AI::Http::HttpResponse
-OpenAiChatCompletionsClient ..> DecisionPayloadNormalizer
 DecisionFactory ..> DecisionId
 DecisionFactory ..> DecisionStatus
 DecisionFactory ..> Scope
@@ -372,39 +100,110 @@ DecisionFactory ..> Rules
 DecisionFactory ..> AiMetadata
 DecisionFactory ..> References
 
-PhpDecide::CLI::ExplainCommand ..> PhpDecideDefaults
-PhpDecide::CLI::ExplainCommand ..> YamlDecisionLoader
-PhpDecide::CLI::ExplainCommand ..> FileDecisionRepository
-PhpDecide::CLI::ExplainCommand ..> PhpDecide::Explain::ExplainService
-PhpDecide::CLI::ExplainCommand ..> PhpDecide::AI::AiClientFactory
-PhpDecide::CLI::ExplainCommand ..> PhpDecide::Explain::AiClientExplainer
+ExplainService *-- DecisionMatcher
+ExplainService ..> DecisionRepository
+ExplainService ..> AiExplainer
+DecisionMatcher ..> DecisionRepository
+DecisionMatcher ..> SearchIndexedDecisionRepository
+DecisionMatcher ..> Decision
+Explanation o-- "0..*" Decision
 
-PhpDecide::CLI::DecisionsLintCommand ..> PhpDecideDefaults
-PhpDecide::CLI::DecisionsLintCommand ..> DecisionFileCollector
-PhpDecide::CLI::DecisionsLintCommand ..> DecisionFactory
-PhpDecide::CLI::DecisionsLintCommand ..> Symfony::Yaml::Yaml
-PhpDecide::CLI::DecisionsLintCommand ..> Symfony::Yaml::ParseException
+AiClientExplainer ..> AiClient
 
-PhpDecide::Explain::ExplainService *-- PhpDecide::Explain::DecisionMatcher
-PhpDecide::Explain::ExplainService ..> PhpDecide::Decision::DecisionRepository
-PhpDecide::Explain::ExplainService ..> PhpDecide::Explain::AiExplainer
+ExplainCommand ..> PhpDecideDefaults
+ExplainCommand ..> YamlDecisionLoader
+ExplainCommand ..> FileDecisionRepository
+ExplainCommand ..> ExplainService
+ExplainCommand ..> AiClientFactory
+ExplainCommand ..> AiClientExplainer
 
-PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::DecisionRepository
-PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::SearchIndexedDecisionRepository
-PhpDecide::Explain::DecisionMatcher ..> PhpDecide::Decision::Decision
-PhpDecide::Explain::Explanation o-- "0..*" PhpDecide::Decision::Decision
+DecisionsLintCommand ..> PhpDecideDefaults
+DecisionsLintCommand ..> DecisionFileCollector
+DecisionsLintCommand ..> DecisionFactory
+DecisionsLintCommand ..> Yaml
+DecisionsLintCommand ..> ParseException
 
-PhpDecide::AI::AiClientFactory ..> OpenAiChatCompletionsClient
-OpenAiChatCompletionsClient ..> PhpDecide::Decision::Decision
+@enduml
+
+@startuml
+' PHPDecide - Diagram 2/2
+' AI client + transport + egress guard
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+left to right direction
+
+set namespaceSeparator ::
+
+title PHPDecide - AI and Guard (src)
+
+package PhpDecide::Decision {
+  class Decision <<external>>
+}
+
+package PhpDecide::AI {
+  interface AiClient
+  class AiClientConfig
+  class AiClientFactory
+  class OpenAiChatCompletionsClient
+  class DecisionPayloadNormalizer
+  class ExplainPromptBuilder
+  class AiClientException
+}
+
+package PhpDecide::AI::Http {
+  interface HttpClient
+  class HttpResponse
+  class CurlHttpClient
+}
+
+package PhpDecide::AI::Guard {
+  class EgressGuardAiClient
+  class GuardPolicy
+  class GuardPolicyFactory
+  class DlpScanner
+  class Finding
+  interface AuditLogger
+  class NullAuditLogger
+  class StderrJsonAuditLogger
+}
+
+' --- Interfaces / implementations ---
+OpenAiChatCompletionsClient ..|> AiClient
+EgressGuardAiClient ..|> AiClient
+CurlHttpClient ..|> HttpClient
+NullAuditLogger ..|> AuditLogger
+StderrJsonAuditLogger ..|> AuditLogger
+
+' --- Composition ---
+OpenAiChatCompletionsClient o-- "1" HttpClient : httpClient
+EgressGuardAiClient o-- "1" AiClient : inner
+EgressGuardAiClient o-- "1" GuardPolicy : policy
+EgressGuardAiClient o-- "1" DlpScanner : dlpScanner
+EgressGuardAiClient o-- "1" AuditLogger : auditLogger
+
+' --- Dependencies ---
+AiClientFactory ..> AiClientConfig
+AiClientFactory ..> HttpClient
+AiClientFactory ..> OpenAiChatCompletionsClient
+AiClientFactory ..> GuardPolicyFactory
+AiClientFactory ..> EgressGuardAiClient
+AiClientFactory ..> StderrJsonAuditLogger
+AiClientFactory ..> NullAuditLogger
+
+CurlHttpClient ..> HttpResponse
+
+OpenAiChatCompletionsClient ..> Decision
+OpenAiChatCompletionsClient ..> DecisionPayloadNormalizer
+OpenAiChatCompletionsClient ..> ExplainPromptBuilder
 OpenAiChatCompletionsClient ..> AiClientException
 
-PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::AiClient : inner
-PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::Guard::GuardPolicy : policy
-PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::Guard::DlpScanner : dlpScanner
-PhpDecide::AI::Guard::EgressGuardAiClient o-- "1" PhpDecide::AI::Guard::AuditLogger : auditLogger
-PhpDecide::AI::Guard::EgressGuardAiClient ..> DecisionPayloadNormalizer
-PhpDecide::AI::Guard::EgressGuardAiClient ..> AiClientException
-PhpDecide::AI::Guard::DlpScanner ..> PhpDecide::AI::Guard::Finding
-PhpDecide::AI::Guard::GuardPolicyFactory ..> PhpDecide::AI::Guard::GuardPolicy
+EgressGuardAiClient ..> DecisionPayloadNormalizer
+EgressGuardAiClient ..> ExplainPromptBuilder
+EgressGuardAiClient ..> AiClientException
+EgressGuardAiClient ..> Decision
+GuardPolicyFactory ..> GuardPolicy
+DlpScanner ..> Finding
 
 @enduml
