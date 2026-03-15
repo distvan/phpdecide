@@ -26,7 +26,8 @@ final class ExplainPromptBuilder
     {
         return mb_strlen(
             self::systemPrompt($systemPromptOverride)
-            . self::userContentFromDecisionPayloadJson($question, $decisionPayloadJson)
+            . self::userContentFromDecisionPayloadJson($question, $decisionPayloadJson),
+            'UTF-8'
         );
     }
 
