@@ -139,8 +139,8 @@ YAML;
 
     private function validLargeDecisionYaml(string $id, string $title, int $rationaleItems): string
     {
-        $rationaleItem = '- ' . str_repeat('x', 48);
-        $rationaleLines = '    ' . implode("\n    ", array_fill(0, $rationaleItems, $rationaleItem));
+        $rationaleItem = '    - ' . str_repeat('x', 48);
+        $rationaleLines = implode("\n", array_fill(0, $rationaleItems, $rationaleItem));
 
         return <<<YAML
 id: {$id}
