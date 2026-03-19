@@ -34,6 +34,9 @@ final class CurlHttpClient implements HttpClient
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => $connectTimeout,
             CURLOPT_TIMEOUT => $timeoutSeconds,
+            // Defense-in-depth: never follow redirects (avoid redirect-based SSRF surprises).
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_MAXREDIRS => 0,
         ]);
 
         // TLS verification is always enabled.

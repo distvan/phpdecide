@@ -24,7 +24,9 @@ final class DecisionsLintCommandTest extends TestCase
     protected function tearDown(): void
     {
         if ($this->originalCwd !== null) {
-            @chdir($this->originalCwd);
+            if (is_dir($this->originalCwd)) {
+                chdir($this->originalCwd);
+            }
             $this->originalCwd = null;
         }
 
@@ -190,6 +192,39 @@ YAML
         self::assertSame(Command::FAILURE, $exitCode);
         self::assertStringContainsString('decision file must parse to a YAML mapping/object', $tester->getDisplay(true));
         self::assertStringContainsString('DEC-0001-scalar.yaml', $tester->getDisplay(true));
+    }
+
+    public function testFailsWhenDecisionHasWrongScalarTypes(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+
+        // YAML parses the id as an int; the factory should report it as a validation error.
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-wrong-id-type.yaml',
+            <<<YAML
+id: 123
+title: Wrong id type
+status: active
+date: '2026-02-03'
+scope:
+    type: global
+decision:
+    summary: Something
+    rationale:
+        - Because.
+YAML
+            );
+
+        $tester = new CommandTester(new DecisionsLintCommand());
+        $exitCode = $tester->execute(['--dir' => $decisionsDir]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+
+        $display = $tester->getDisplay(true);
+        self::assertStringContainsString('Decision lint failed', $display);
+        self::assertStringContainsString('DEC-0001-wrong-id-type.yaml', $display);
+        self::assertStringContainsString("Field 'id' must be a non-empty string", $display);
     }
 
     public function testFailsWhenStringListFieldsContainNonStringOrEmptyItems(): void

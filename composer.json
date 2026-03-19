@@ -10,6 +10,7 @@
         }
     ],
     "require": {
+        "ext-mbstring": "*",
         "symfony/yaml": "^7.4",
         "symfony/console": "^7.4"
     },

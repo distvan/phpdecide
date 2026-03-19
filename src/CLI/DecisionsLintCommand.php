@@ -16,6 +16,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use UnexpectedValueException;
 use InvalidArgumentException;
+use Throwable;
 
 #[AsCommand(
     name: 'decisions:lint',
@@ -149,6 +150,14 @@ final class DecisionsLintCommand extends Command
             } catch (ParseException $e) {
                 $errors[] = sprintf('%s: invalid YAML (%s)', $fileLabel, $e->getMessage());
                 continue;
+            } catch (Throwable $e) {
+                $errors[] = sprintf(
+                    '%s: unable to parse YAML (%s: %s)',
+                    $fileLabel,
+                    $e::class,
+                    $e->getMessage()
+                );
+                continue;
             }
 
             if (!is_array($data)) {
@@ -161,6 +170,14 @@ final class DecisionsLintCommand extends Command
                 $decisions[] = $decision;
             } catch (InvalidArgumentException $e) {
                 $errors[] = sprintf('%s: %s', $fileLabel, $e->getMessage());
+                continue;
+            } catch (Throwable $e) {
+                $errors[] = sprintf(
+                    '%s: unexpected error while validating decision (%s: %s)',
+                    $fileLabel,
+                    $e::class,
+                    $e->getMessage()
+                );
                 continue;
             }
 
