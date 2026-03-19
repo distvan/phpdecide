@@ -6,6 +6,8 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-19
+
 ### Added
 - CLI AI egress guard (recommended for enterprise/CI) to reduce sensitive-data egress risk when using `explain --ai`.
   - Enable via `PHPDECIDE_AI_GUARD=1`.
@@ -86,4 +88,5 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 [1.0.0]: https://github.com/distvan/phpdecide/releases/tag/v1.0.0
 [1.1.0]: https://github.com/distvan/phpdecide/releases/tag/v1.1.0
-[Unreleased]: https://github.com/distvan/phpdecide/compare/v1.1.0...HEAD
+[1.2.0]: https://github.com/distvan/phpdecide/releases/tag/v1.2.0
+[Unreleased]: https://github.com/distvan/phpdecide/compare/v1.2.0...HEAD
