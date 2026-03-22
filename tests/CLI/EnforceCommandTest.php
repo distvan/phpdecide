@@ -6,6 +6,7 @@ namespace PhpDecide\Tests\CLI;
 
 use PhpDecide\CLI\EnforceCommand;
 use PhpDecide\Config\PhpDecideDefaults;
+use PhpDecide\Tests\Support\TestFilesystemException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -552,7 +553,7 @@ final class EnforceCommandTest extends TestCase
     {
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phpdecide_enforce_tests_' . bin2hex(random_bytes(8));
         if (!mkdir($dir) && !is_dir($dir)) {
-            throw new TempDirectoryCreationFailed('Unable to create temp dir: ' . $dir);
+            throw new TestFilesystemException('Unable to create temp dir: ' . $dir);
         }
 
         $decisionsDir = $dir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
@@ -630,8 +631,4 @@ YAML;
 
         rmdir($dir);
     }
-}
-
-final class TempDirectoryCreationFailed extends \RuntimeException
-{
 }
