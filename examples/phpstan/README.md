@@ -1,16 +1,18 @@
 # PHPStan example assets
 
-This directory contains a checked-in native PHPStan JSON report that already maps to an active sample decision in this repository.
+This directory contains a sample native PHPStan JSON report that maps to a decision token you can record in your own project's `.decisions/` directory.
 
 Files:
 
 - `no-orm-in-order-domain-report.json`: native `--error-format=json` style report using the decision token `phpstan.doctrine.orm`
 
-Matching decision and fixture files:
+Matching fixture files:
 
-- `.decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml`
 - `examples/fixtures/phpstan/src/Order/OrderService.php`
 - `examples/fixtures/phpstan/src/Infrastructure/Persistence/Doctrine/OrderRecord.php`
+- `examples/decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml`
+
+In your own project, create a decision file under `.decisions/` that includes the token `phpstan.doctrine.orm` in `rules.forbid`.
 
 Try it locally:
 
@@ -31,7 +33,7 @@ The important contract is that the PHPStan message `identifier` field must equal
 In a real project, the native JSON report usually comes from a custom PHPStan rule or extension.
 The key requirement for PHPDecide is simple: the rule must emit a stable identifier that matches the decision token.
 
-For the checked-in example in this repository, that token is:
+For this example flow, that token is:
 
 - `phpstan.doctrine.orm`
 

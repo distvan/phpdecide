@@ -128,6 +128,9 @@ Or feed PHPStan output directly:
 
 Checked-in example assets:
 
+- Example decision: [examples/decisions/DEC-0003.no-orm-in-order-domain.yaml](examples/decisions/DEC-0003.no-orm-in-order-domain.yaml)
+- Example decision: [examples/decisions/DEC-0004.no-business-logic-in-templates.yaml](examples/decisions/DEC-0004.no-business-logic-in-templates.yaml)
+- Example decision: [examples/decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml](examples/decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml)
 - Semgrep rule example: [semgrep/rules/no-orm-in-order-domain.yaml](semgrep/rules/no-orm-in-order-domain.yaml)
 - Semgrep rule example: [semgrep/rules/no-business-logic-in-templates.yaml](semgrep/rules/no-business-logic-in-templates.yaml)
 - PHPStan report example: [examples/phpstan/no-orm-in-order-domain-report.json](examples/phpstan/no-orm-in-order-domain-report.json)
@@ -137,11 +140,13 @@ Checked-in example assets:
 - PR comment renderer: [examples/github-actions/render-phpdecide-pr-comment.php](examples/github-actions/render-phpdecide-pr-comment.php)
 - Annotation renderer: [examples/github-actions/render-phpdecide-annotations.php](examples/github-actions/render-phpdecide-annotations.php)
 
-Matching decision examples:
+Matching decision tokens for your own project decisions:
 
-- Active repo sample decision: [.decisions/DEC-0003.no-orm-in-order-domain.yaml](.decisions/DEC-0003.no-orm-in-order-domain.yaml)
-- Active repo sample decision: [.decisions/DEC-0004.no-business-logic-in-templates.yaml](.decisions/DEC-0004.no-business-logic-in-templates.yaml)
-- Active repo sample decision: [.decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml](.decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml)
+- `doctrine/orm`
+- `twig/business-logic`
+- `phpstan.doctrine.orm`
+
+Record those tokens in decision files under your own project's `.decisions/` directory.
 
 Sample fixture files used by the second rule:
 
@@ -247,7 +252,7 @@ PHPDecide is ideal for:
 
 ### Quickstart (Phase 1: explain adoption)
 
-1) Create a `.decisions/` folder in your repo root and add your first decision file.
+1) Create a `.decisions/` folder in your project root and add your first decision file.
 
 2) Validate decisions locally (fast feedback):
 
@@ -284,7 +289,7 @@ For CI integration, prefer:
 
 `php ./bin/phpdecide enforce --semgrep-report build/semgrep.json --format json`
 
-If you want a starting point, this repository includes two Semgrep rule examples that both map to active sample decisions in `.decisions/`. The second sample intentionally targets example fixture files under `examples/fixtures/templates/` rather than a real application template directory.
+If you want a starting point, this repository includes visible example decision files under [examples/decisions](examples/decisions), plus Semgrep and PHPStan example assets that use the same stable tokens. The GitHub Actions examples stage those decision files into a temporary directory before running `decisions:lint --require-any` and `enforce`, so the workflow stays self-contained. The second Semgrep sample intentionally targets example fixture files under `examples/fixtures/templates/` rather than a real application template directory.
 
 The command fails when it finds decision-linked violations, which makes it suitable for CI.
 

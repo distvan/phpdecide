@@ -23,8 +23,13 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist
 
+      - name: Stage example decision files
+        run: |
+          mkdir -p build/example-decisions
+          cp examples/decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml build/example-decisions/
+
       - name: Lint decision files
-        run: php ./bin/phpdecide decisions:lint --require-any
+        run: php ./bin/phpdecide decisions:lint --dir build/example-decisions --require-any
 
       - name: Stage a native PHPStan JSON report
         run: |
@@ -36,6 +41,7 @@ jobs:
         run: |
           set +e
           php ./bin/phpdecide enforce \
+            --dir build/example-decisions \
             --phpstan-report build/phpstan.json \
             --format json \
             > build/phpdecide-enforce.json

@@ -1,0 +1,48 @@
+id: DEC-0003
+title: No ORM in Order domain
+status: active
+date: '2024-11-23'
+
+scope:
+  type: path
+  paths:
+    - 'src/Order/*'
+
+decision:
+  summary: >
+    The Order domain must not depend on any ORM library.
+    Persistence concerns must be handled outside the domain layer.
+
+  rationale:
+    - The Order domain contains core business rules and should stay persistence-ignorant.
+    - ORMs tend to leak infrastructure concepts (lazy-loading, proxies, annotations) into the model.
+    - Keeping persistence outside the domain improves testability and makes behavior easier to reason about.
+
+  alternatives:
+    - Use an ORM everywhere for speed of delivery.
+    - Use an ORM only for read models and keep the write domain persistence-ignorant.
+    - Use a lightweight mapper (hand-written mapping, query builder) at the boundary.
+
+examples:
+  allowed:
+    - 'src/Infrastructure/Persistence/Doctrine/*'
+  forbidden:
+    - 'src/Order/*'
+
+rules:
+  forbid:
+    - 'doctrine/orm'
+  allow: []
+
+references:
+  issues: []
+  commits: []
+  adr: null
+
+ai:
+  explain_style: 'Explain as an architecture mentor: focus on coupling, boundaries, and testability.'
+  keywords:
+    - 'persistence ignorance'
+    - 'domain model'
+    - 'coupling'
+    - 'testability'

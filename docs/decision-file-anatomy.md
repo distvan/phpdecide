@@ -12,7 +12,7 @@ This document describes a **recommended structure** that also matches what PHPDe
 
 ## File placement and naming
 
-- Put decisions under `.decisions/` in the repo root.
+- Put decisions under `.decisions/` in your project root.
 - Use the `.yaml` extension (the loader currently loads only `.yaml`, not `.yml`).
 - Keep filenames stable and sortable, e.g.:
 	- `DEC-0001-no-orms.yaml`
@@ -119,7 +119,7 @@ rules:
 - Prefer a small number of strong rules over many weak ones.
 - In `v1.3.0`, the `enforce` command matches external analyzer findings by comparing the finding `rule_id` to `rules.forbid`, after scope filtering.
 - See [semgrep/rules/no-orm-in-order-domain.yaml](../semgrep/rules/no-orm-in-order-domain.yaml) for a checked-in example where the Semgrep rule ID matches the decision token `doctrine/orm`.
-- See [../.decisions/DEC-0004.no-business-logic-in-templates.yaml](../.decisions/DEC-0004.no-business-logic-in-templates.yaml) and [semgrep/rules/no-business-logic-in-templates.yaml](../semgrep/rules/no-business-logic-in-templates.yaml) for a second example pairing using the token `twig/business-logic`.
+- See [semgrep/rules/no-business-logic-in-templates.yaml](../semgrep/rules/no-business-logic-in-templates.yaml) for a second example token pairing using `twig/business-logic`. In your own project, record the matching token in a decision file under `.decisions/`.
 
 ### `references` (optional)
 
@@ -212,4 +212,4 @@ ai:
 
 ## Example
 
-- See [DEC-0003.no-orm-in-order-domain.yaml](DEC-0003.no-orm-in-order-domain.yaml) for a complete example that matches the current schema.
+- See [DEC-0003.no-orm-in-order-domain.yaml](DEC-0003.no-orm-in-order-domain.yaml) for a complete example decision document that matches the current schema.

@@ -31,8 +31,14 @@ jobs:
       - name: Install Semgrep
         run: python -m pip install --upgrade pip semgrep
 
+      - name: Stage example decision files
+        run: |
+          mkdir -p build/example-decisions
+          cp examples/decisions/DEC-0003.no-orm-in-order-domain.yaml build/example-decisions/
+          cp examples/decisions/DEC-0004.no-business-logic-in-templates.yaml build/example-decisions/
+
       - name: Lint decision files
-        run: php ./bin/phpdecide decisions:lint --require-any
+        run: php ./bin/phpdecide decisions:lint --dir build/example-decisions --require-any
 
       - name: Run Semgrep example rules
         run: |
@@ -47,6 +53,7 @@ jobs:
         run: |
           set +e
           php ./bin/phpdecide enforce \
+            --dir build/example-decisions \
             --semgrep-report build/semgrep.json \
             --format json \
             > build/phpdecide-enforce.json
