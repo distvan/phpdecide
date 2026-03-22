@@ -101,6 +101,130 @@ When enforced:
 
 This turns architecture from "guideline" into living constraints.
 
+### First enforcement-ready workflow (`v1.3.0`)
+
+The first enforcement slice does not build a new analyzer.
+Instead, PHPDecide maps external analyzer findings back to decision IDs.
+
+Run it with a generic JSON report:
+
+`php ./bin/phpdecide enforce --report build/phpdecide-findings.json`
+
+Emit a machine-readable result for CI or bots:
+
+`php ./bin/phpdecide enforce --report build/phpdecide-findings.json --format json`
+
+Or feed Semgrep output directly:
+
+`semgrep scan --config semgrep/rules --json --output build/semgrep.json`
+
+`php ./bin/phpdecide enforce --semgrep-report build/semgrep.json`
+
+Or feed PHPStan output directly:
+
+`phpstan analyse --error-format=json > build/phpstan.json`
+
+`php ./bin/phpdecide enforce --phpstan-report build/phpstan.json`
+
+Checked-in example assets:
+
+- Semgrep rule example: [semgrep/rules/no-orm-in-order-domain.yaml](semgrep/rules/no-orm-in-order-domain.yaml)
+- Semgrep rule example: [semgrep/rules/no-business-logic-in-templates.yaml](semgrep/rules/no-business-logic-in-templates.yaml)
+- PHPStan report example: [examples/phpstan/no-orm-in-order-domain-report.json](examples/phpstan/no-orm-in-order-domain-report.json)
+- PHPStan example notes: [examples/phpstan/README.md](examples/phpstan/README.md)
+- GitHub Actions example: [examples/github-actions/phpdecide-semgrep-enforce.yaml](examples/github-actions/phpdecide-semgrep-enforce.yaml)
+- GitHub Actions example: [examples/github-actions/phpdecide-phpstan-enforce.yaml](examples/github-actions/phpdecide-phpstan-enforce.yaml)
+- PR comment renderer: [examples/github-actions/render-phpdecide-pr-comment.php](examples/github-actions/render-phpdecide-pr-comment.php)
+- Annotation renderer: [examples/github-actions/render-phpdecide-annotations.php](examples/github-actions/render-phpdecide-annotations.php)
+
+Matching decision examples:
+
+- Active repo sample decision: [.decisions/DEC-0003.no-orm-in-order-domain.yaml](.decisions/DEC-0003.no-orm-in-order-domain.yaml)
+- Active repo sample decision: [.decisions/DEC-0004.no-business-logic-in-templates.yaml](.decisions/DEC-0004.no-business-logic-in-templates.yaml)
+- Active repo sample decision: [.decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml](.decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml)
+
+Sample fixture files used by the second rule:
+
+- Allowed fixture: [examples/fixtures/templates/order/show.html.twig](examples/fixtures/templates/order/show.html.twig)
+- Violating fixture: [examples/fixtures/templates/order/calculate_total.html.twig](examples/fixtures/templates/order/calculate_total.html.twig)
+
+Sample fixture files used by the PHPStan example:
+
+- Allowed fixture: [examples/fixtures/phpstan/src/Infrastructure/Persistence/Doctrine/OrderRecord.php](examples/fixtures/phpstan/src/Infrastructure/Persistence/Doctrine/OrderRecord.php)
+- Violating fixture: [examples/fixtures/phpstan/src/Order/OrderService.php](examples/fixtures/phpstan/src/Order/OrderService.php)
+
+Supported JSON shapes:
+
+```json
+{
+    "findings": [
+        {
+            "tool": "semgrep",
+            "rule_id": "doctrine/orm",
+            "path": "src/Order/OrderService.php",
+            "line": 12,
+            "severity": "error",
+            "message": "Doctrine ORM import detected."
+        }
+    ]
+}
+```
+
+Or a top-level JSON array of the same finding objects.
+
+Initial mapping behavior:
+
+- active decisions only
+- scope must match the finding path
+- the finding `rule_id` must equal a token listed in `rules.forbid`
+
+This gives CI a stable way to print violations grouped by decision ID without forcing PHPDecide to own static analysis itself.
+For Semgrep, PHPDecide reads native `results[*].check_id`, `path`, `start.line`, and `extra.message` / `extra.severity` fields and converts them internally.
+For PHPStan, PHPDecide reads native `files[*].messages[*]` entries and maps the message `identifier` field to the decision token in `rules.forbid`.
+The repository includes a checked-in native example report at [examples/phpstan/no-orm-in-order-domain-report.json](examples/phpstan/no-orm-in-order-domain-report.json) so teams can copy the JSON shape and token contract directly.
+There is also a short authoring note in [examples/phpstan/README.md](examples/phpstan/README.md) showing how a real PHPStan custom rule should emit the same identifier token.
+
+When `--format json` is used, the command emits a structured payload with:
+
+- `ok`
+- `summary`
+- `violations_by_decision`
+- `unmapped_findings`
+
+The exit code behavior does not change: matched decision violations still produce a non-zero exit code.
+
+The checked-in GitHub Actions example now demonstrates the full structured path:
+
+- run Semgrep
+- call `phpdecide enforce --format json`
+- render PR-comment markdown from the JSON payload
+- render GitHub annotation commands from the same JSON payload
+- write a human-readable step summary from that markdown
+- upload the JSON artifact
+- upload the markdown artifact
+- upload the annotation command artifact
+- fail the job if the enforcement exit code was non-zero
+
+There is also a parallel PHPStan-flavored workflow example:
+
+- stage a native PHPStan JSON report
+- call `phpdecide enforce --phpstan-report ... --format json`
+- reuse the same markdown and annotation renderers
+- upload the JSON, markdown, and annotation artifacts
+- fail the job if the enforcement exit code was non-zero
+
+See [examples/github-actions/phpdecide-phpstan-enforce.yaml](examples/github-actions/phpdecide-phpstan-enforce.yaml).
+
+The renderer can also be used locally:
+
+`php examples/github-actions/render-phpdecide-pr-comment.php build/phpdecide-enforce.json`
+
+The annotation renderer can also be used locally:
+
+`php examples/github-actions/render-phpdecide-annotations.php build/phpdecide-enforce.json`
+
+Use the PR-comment renderer when you want one grouped markdown summary. Use the annotation renderer when you want file-level warnings/errors that show up inline in GitHub Actions logs and checks.
+
 ### Philosophy of AI Usage in PHPDecide
 
 - AI is an assistant, not an Authority
@@ -137,6 +261,32 @@ PHPDecide is ideal for:
     - `php ./bin/phpdecide explain "Why no ORMs?" --path src/Order/OrderService.php`
 
 Tip: use [docs/decision-file-anatomy.md](docs/decision-file-anatomy.md) as the schema guide.
+
+### Quickstart (Phase 2: enforcement-ready mapping)
+
+1) Add stable machine-oriented tokens in decision `rules.forbid`.
+
+2) Configure your analyzer to emit matching `rule_id` values.
+
+3) Feed the analyzer report into PHPDecide:
+
+`php ./bin/phpdecide enforce --report build/phpdecide-findings.json`
+
+Or use Semgrep directly:
+
+`php ./bin/phpdecide enforce --semgrep-report build/semgrep.json`
+
+Or use PHPStan directly:
+
+`php ./bin/phpdecide enforce --phpstan-report build/phpstan.json`
+
+For CI integration, prefer:
+
+`php ./bin/phpdecide enforce --semgrep-report build/semgrep.json --format json`
+
+If you want a starting point, this repository includes two Semgrep rule examples that both map to active sample decisions in `.decisions/`. The second sample intentionally targets example fixture files under `examples/fixtures/templates/` rather than a real application template directory.
+
+The command fails when it finds decision-linked violations, which makes it suitable for CI.
 
 ### Decision loading cache (optional)
 

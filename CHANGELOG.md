@@ -6,6 +6,44 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 ## [Unreleased]
 
+### Added
+- CLI command `enforce` for the first `v1.3.0` enforcement-ready workflow.
+  - Consumes a generic JSON analyzer report from `--report`.
+  - Consumes native Semgrep JSON from `--semgrep-report`.
+  - Consumes native PHPStan JSON from `--phpstan-report`.
+  - Supports `--format json` for machine-readable CI/bot integration output.
+  - Matches findings to active decisions by scope and `rules.forbid` token.
+  - Prints violations grouped by decision ID and exits non-zero when decision-linked violations are found.
+- Checked-in Semgrep example assets for the `DEC-0003` flow:
+  - `semgrep/rules/no-orm-in-order-domain.yaml`
+  - `examples/github-actions/phpdecide-semgrep-enforce.yaml`
+- Added a second active sample decision/rule pair for template boundaries:
+  - `.decisions/DEC-0004.no-business-logic-in-templates.yaml`
+  - `semgrep/rules/no-business-logic-in-templates.yaml`
+- Added example Twig fixtures so the template-boundary rule has a concrete allowed/violating path pair:
+  - `examples/fixtures/templates/order/show.html.twig`
+  - `examples/fixtures/templates/order/calculate_total.html.twig`
+- Added checked-in PHPStan example assets for the native identifier mapping path:
+  - `.decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml`
+  - `examples/phpstan/no-orm-in-order-domain-report.json`
+  - `examples/phpstan/README.md`
+  - `examples/fixtures/phpstan/src/Order/OrderService.php`
+  - `examples/fixtures/phpstan/src/Infrastructure/Persistence/Doctrine/OrderRecord.php`
+  - includes a minimal custom-rule sketch showing how to emit `phpstan.doctrine.orm`
+- Added a parallel GitHub Actions example for the PHPStan mapping path:
+  - `examples/github-actions/phpdecide-phpstan-enforce.yaml`
+- The checked-in GitHub Actions example now consumes `enforce --format json`, writes a job summary from the JSON payload, uploads the JSON artifact, and fails the workflow based on the recorded enforcement exit code.
+- Added a reusable example markdown renderer for enforcement JSON output:
+  - `examples/github-actions/render-phpdecide-pr-comment.php`
+- Added a second reusable example consumer for enforcement JSON output:
+  - `examples/github-actions/render-phpdecide-annotations.php`
+
+### Fixed
+- Enforcement JSON report loading now normalizes UTF-8 BOM and UTF-16/UTF-32 encoded files, improving compatibility with shell-generated reports on Windows and CI.
+
+### Changed
+- Decision `rules.forbid` tokens now have an operational contract for enforcement mapping: analyzer `rule_id` values can be mapped back to decisions through the `enforce` command.
+
 ## [1.2.0] - 2026-03-19
 
 ### Added
