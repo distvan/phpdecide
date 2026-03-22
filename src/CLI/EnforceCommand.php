@@ -82,8 +82,7 @@ final class EnforceCommand extends Command
 
         $validationError = $this->validateInputs($dir, $reportPath, $semgrepReportPath, $phpStanReportPath, $format);
         if ($validationError !== null) {
-            $this->renderError($output, $validationError, $format);
-            return Command::FAILURE;
+            return $this->renderFailure($output, $validationError, $format);
         }
 
         try {
@@ -95,11 +94,22 @@ final class EnforceCommand extends Command
                 ? $e->getMessage()
                 : sprintf('Unable to run enforcement mapping: %s', $e->getMessage());
 
-            $this->renderError($output, $message, $format);
-            return Command::FAILURE;
+            return $this->renderFailure($output, $message, $format);
         }
 
-        return $this->renderResult($output, $result, $format);
+        $exitCode = Command::FAILURE;
+
+        try {
+            $exitCode = $this->renderResult($output, $result, $format);
+        } catch (Throwable $e) {
+            $exitCode = $this->renderFailure(
+                $output,
+                sprintf('Unable to render enforcement output: %s', $e->getMessage()),
+                $format
+            );
+        }
+
+        return $exitCode;
     }
 
     private function resolveDir(InputInterface $input): string
@@ -240,6 +250,25 @@ final class EnforceCommand extends Command
         $output->writeln('<error>' . $message . '</error>');
     }
 
+    private function renderFailure(OutputInterface $output, string $message, string $format): int
+    {
+        try {
+            $this->renderError($output, $message, $format);
+        } catch (Throwable) {
+            try {
+                if ($format === self::FORMAT_JSON) {
+                    $output->writeln('{"ok":false,"error":"Unable to render enforcement output."}');
+                } else {
+                    $output->writeln('<error>Unable to render enforcement output.</error>');
+                }
+            } catch (Throwable $ignored) {
+                return Command::FAILURE;
+            }
+        }
+
+        return Command::FAILURE;
+    }
+
     private function normalizeFormat(string $format): string
     {
         return strtolower(trim($format));
@@ -319,7 +348,7 @@ final class EnforceCommand extends Command
     private function writeJson(OutputInterface $output, array $payload): void
     {
         try {
-            $output->writeln(json_encode($payload, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+            $output->writeln(json_encode($payload, JSON_PRETTY_PRINT | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR));
         } catch (JsonException $e) {
             throw new InvalidArgumentException('Unable to encode JSON enforcement output.', 0, $e);
         }

@@ -8,7 +8,10 @@ use PhpDecide\CLI\EnforceCommand;
 use PhpDecide\Config\PhpDecideDefaults;
 use PhpDecide\Tests\Support\TestFilesystemException;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\CommandTester;
 
 final class EnforceCommandTest extends TestCase
@@ -567,6 +570,76 @@ final class EnforceCommandTest extends TestCase
         $payload = $this->decodeJsonOutput($tester->getDisplay(true));
         self::assertFalse($payload['ok']);
         self::assertStringContainsString('findings[0].rule_id must be a non-empty string', $payload['error']);
+    }
+
+    public function testJsonFormatReturnsStructuredErrorWhenInitialRenderFails(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'findings.json';
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0003-no-orm.yaml',
+            $this->decisionYamlWithRules('DEC-0003', 'No ORM in Order domain', ['src/Order/*'], ['doctrine/orm'])
+        );
+
+        $this->writeFile(
+            $reportPath,
+            json_encode([
+                'findings' => [[
+                    'tool' => 'semgrep',
+                    'rule_id' => 'doctrine/orm',
+                    'path' => 'src/Order/OrderService.php',
+                    'line' => 12,
+                    'severity' => 'error',
+                    'message' => 'Doctrine ORM import detected.',
+                ]],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+        );
+
+        $command = new EnforceCommand();
+        $output = new class extends BufferedOutput {
+            private bool $shouldFail = true;
+
+            public function writeln(string|iterable $messages, int $options = self::OUTPUT_NORMAL): void
+            {
+                if ($this->shouldFail) {
+                    $this->shouldFail = false;
+
+                    throw new TestFilesystemException('Simulated output failure.');
+                }
+
+                parent::writeln($messages, $options);
+            }
+        };
+
+        $exitCode = $command->run(new ArrayInput([
+            '--dir' => $decisionsDir,
+            '--report' => $reportPath,
+            '--format' => 'json',
+        ]), $output);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+
+        $payload = $this->decodeJsonOutput($output->fetch());
+        self::assertFalse($payload['ok']);
+        self::assertStringContainsString('Unable to render enforcement output: Simulated output failure.', $payload['error']);
+    }
+
+    public function testWriteJsonSubstitutesInvalidUtf8InsteadOfThrowing(): void
+    {
+        $command = new EnforceCommand();
+        $output = new BufferedOutput();
+        $writeJson = new ReflectionMethod(EnforceCommand::class, 'writeJson');
+
+        $writeJson->invoke($command, $output, [
+            'ok' => false,
+            'error' => "Bad\xB1Message",
+        ]);
+
+        $payload = $this->decodeJsonOutput($output->fetch());
+        self::assertFalse($payload['ok']);
+        self::assertSame('426164efbfbd4d657373616765', bin2hex($payload['error']));
     }
 
     protected function tearDown(): void
