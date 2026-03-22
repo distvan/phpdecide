@@ -661,7 +661,9 @@ final class EnforceCommandTest extends TestCase
         }
 
         $decisionsDir = $dir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
-        mkdir($decisionsDir);
+        if (!mkdir($decisionsDir) && !is_dir($decisionsDir)) {
+            throw new TestFilesystemException('Unable to create decisions dir: ' . $decisionsDir);
+        }
 
         $this->tempDirs[] = $dir;
 
@@ -703,7 +705,9 @@ YAML;
 
     private function writeFile(string $path, string $contents): void
     {
-        file_put_contents($path, $contents);
+        if (file_put_contents($path, $contents) === false) {
+            throw new TestFilesystemException(sprintf('Unable to write file: %s', $path));
+        }
     }
 
     /**
