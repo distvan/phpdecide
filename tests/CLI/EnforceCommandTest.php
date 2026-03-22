@@ -411,11 +411,42 @@ final class EnforceCommandTest extends TestCase
         self::assertSame('DEC-0005', $payload['violations_by_decision'][0]['decision_id']);
     }
 
-    public function testCheckedInPhpStanExampleReportMapsToDec0005(): void
+    public function testPhpStanReportMapsToDec0005WithoutUsingRepositoryDecisions(): void
     {
-        $repositoryRoot = dirname(__DIR__, 2);
-        $decisionsDir = $repositoryRoot . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
-        $reportPath = $repositoryRoot . DIRECTORY_SEPARATOR . 'examples' . DIRECTORY_SEPARATOR . 'phpstan' . DIRECTORY_SEPARATOR . 'no-orm-in-order-domain-report.json';
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'phpstan.json';
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0005-phpstan-no-orm.yaml',
+            $this->decisionYamlWithRules(
+                'DEC-0005',
+                'No ORM in Order domain via PHPStan',
+                ['examples/fixtures/phpstan/src/Order/*', 'examples/fixtures/phpstan/src/Order/**/*'],
+                ['phpstan.doctrine.orm']
+            )
+        );
+
+        $this->writeFile(
+            $reportPath,
+            json_encode([
+                'totals' => [
+                    'errors' => 0,
+                    'file_errors' => 1,
+                ],
+                'files' => [
+                    'examples/fixtures/phpstan/src/Order/OrderService.php' => [
+                        'errors' => 1,
+                        'messages' => [[
+                            'message' => 'Doctrine ORM symbol detected in the Order domain example.',
+                            'line' => 7,
+                            'identifier' => 'phpstan.doctrine.orm',
+                        ]],
+                    ],
+                ],
+                'errors' => [],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+        );
 
         $tester = new CommandTester(new EnforceCommand());
         $exitCode = $tester->execute([
