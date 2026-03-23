@@ -31,6 +31,7 @@ final class EnforceCommand extends Command
 {
     private const FORMAT_TEXT = 'text';
     private const FORMAT_JSON = 'json';
+    private const JSON_FALLBACK_ERROR = '{"ok":false,"error":"Unable to render enforcement output."}';
 
     protected function configure(): void
     {
@@ -257,7 +258,7 @@ final class EnforceCommand extends Command
         } catch (Throwable) {
             try {
                 if ($format === self::FORMAT_JSON) {
-                    $output->writeln('{"ok":false,"error":"Unable to render enforcement output."}');
+                    $output->writeln(self::JSON_FALLBACK_ERROR);
                 } else {
                     $output->writeln('<error>Unable to render enforcement output.</error>');
                 }

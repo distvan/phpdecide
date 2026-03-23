@@ -625,6 +625,65 @@ final class EnforceCommandTest extends TestCase
         self::assertStringContainsString('Unable to render enforcement output: Simulated output failure.', $payload['error']);
     }
 
+    public function testJsonFormatFallbackOutputIsValidJsonWhenErrorRenderingFailsTwice(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'findings.json';
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0003-no-orm.yaml',
+            $this->decisionYamlWithRules('DEC-0003', 'No ORM in Order domain', ['src/Order/*'], ['doctrine/orm'])
+        );
+
+        $this->writeFile(
+            $reportPath,
+            json_encode([
+                'findings' => [[
+                    'tool' => 'semgrep',
+                    'rule_id' => 'doctrine/orm',
+                    'path' => 'src/Order/OrderService.php',
+                    'line' => 12,
+                    'severity' => 'error',
+                    'message' => 'Doctrine ORM import detected.',
+                ]],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+        );
+
+        $command = new EnforceCommand();
+        $output = new class extends BufferedOutput {
+            private int $failureCount = 0;
+
+            public function writeln(string|iterable $messages, int $options = self::OUTPUT_NORMAL): void
+            {
+                if ($this->failureCount < 2) {
+                    $this->failureCount++;
+
+                    throw new TestFilesystemException('Simulated repeated output failure.');
+                }
+
+                parent::writeln($messages, $options);
+            }
+        };
+
+        $exitCode = $command->run(new ArrayInput([
+            '--dir' => $decisionsDir,
+            '--report' => $reportPath,
+            '--format' => 'json',
+        ]), $output);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        $rawOutput = trim($output->fetch());
+        self::assertSame(
+            '{"ok":false,"error":"Unable to render enforcement output."}',
+            $rawOutput
+        );
+
+        $payload = $this->decodeJsonOutput($rawOutput);
+        self::assertFalse($payload['ok']);
+        self::assertSame('Unable to render enforcement output.', $payload['error']);
+    }
+
     public function testJsonFormatSubstitutesInvalidUtf8InErrorMessages(): void
     {
         $projectDir = $this->createTempProjectDir();
