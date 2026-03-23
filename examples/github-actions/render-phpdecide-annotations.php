@@ -182,18 +182,27 @@ function githubCommand(string $level, array $properties, string $message): strin
 {
     $prefix = '::' . $level;
     if ($properties === []) {
-        return $prefix . '::' . escapeCommandValue($message);
+        return $prefix . '::' . escapeCommandData($message);
     }
 
     $pairs = [];
     foreach ($properties as $key => $value) {
-        $pairs[] = $key . '=' . escapeCommandValue($value);
+        $pairs[] = $key . '=' . escapeCommandProperty($value);
     }
 
-    return sprintf('%s %s::%s', $prefix, implode(',', $pairs), escapeCommandValue($message));
+    return sprintf('%s %s::%s', $prefix, implode(',', $pairs), escapeCommandData($message));
 }
 
-function escapeCommandValue(string $value): string
+function escapeCommandData(string $value): string
+{
+    return str_replace(
+        ['%', "\r", "\n"],
+        ['%25', '%0D', '%0A'],
+        $value
+    );
+}
+
+function escapeCommandProperty(string $value): string
 {
     return str_replace(
         ['%', "\r", "\n", ':', ','],
