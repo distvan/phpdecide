@@ -8,7 +8,6 @@ use PhpDecide\CLI\EnforceCommand;
 use PhpDecide\Config\PhpDecideDefaults;
 use PhpDecide\Tests\Support\TestFilesystemException;
 use PHPUnit\Framework\TestCase;
-use ReflectionMethod;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -626,20 +625,27 @@ final class EnforceCommandTest extends TestCase
         self::assertStringContainsString('Unable to render enforcement output: Simulated output failure.', $payload['error']);
     }
 
-    public function testWriteJsonSubstitutesInvalidUtf8InsteadOfThrowing(): void
+    public function testJsonFormatSubstitutesInvalidUtf8InErrorMessages(): void
     {
-        $command = new EnforceCommand();
-        $output = new BufferedOutput();
-        $writeJson = new ReflectionMethod(EnforceCommand::class, 'writeJson');
+        $projectDir = $this->createTempProjectDir();
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'findings.json';
+        $invalidDir = $projectDir . DIRECTORY_SEPARATOR . "bad\xB1dir";
 
-        $writeJson->invoke($command, $output, [
-            'ok' => false,
-            'error' => "Bad\xB1Message",
+        $this->writeFile($reportPath, json_encode([], JSON_THROW_ON_ERROR));
+
+        $tester = new CommandTester(new EnforceCommand());
+        $exitCode = $tester->execute([
+            '--dir' => $invalidDir,
+            '--report' => $reportPath,
+            '--format' => 'json',
         ]);
 
-        $payload = $this->decodeJsonOutput($output->fetch());
+        self::assertSame(Command::FAILURE, $exitCode);
+
+        $payload = $this->decodeJsonOutput($tester->getDisplay(true));
         self::assertFalse($payload['ok']);
-        self::assertSame('426164efbfbd4d657373616765', bin2hex($payload['error']));
+        self::assertStringContainsString('Decisions directory not found:', $payload['error']);
+        self::assertStringContainsString('efbfbd', bin2hex($payload['error']));
     }
 
     protected function tearDown(): void

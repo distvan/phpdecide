@@ -6,6 +6,8 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-23
+
 ### Added
 - CLI command `enforce` for the first `v1.3.0` enforcement-ready workflow.
   - Consumes a generic JSON analyzer report from `--report`.
@@ -128,4 +130,5 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 [1.0.0]: https://github.com/distvan/phpdecide/releases/tag/v1.0.0
 [1.1.0]: https://github.com/distvan/phpdecide/releases/tag/v1.1.0
 [1.2.0]: https://github.com/distvan/phpdecide/releases/tag/v1.2.0
-[Unreleased]: https://github.com/distvan/phpdecide/compare/v1.2.0...HEAD
+[1.3.0]: https://github.com/distvan/phpdecide/releases/tag/v1.3.0
+[Unreleased]: https://github.com/distvan/phpdecide/compare/v1.3.0...HEAD
