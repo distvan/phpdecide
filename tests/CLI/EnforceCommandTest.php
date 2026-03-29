@@ -12,6 +12,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Yaml\Yaml;
 
 final class EnforceCommandTest extends TestCase
 {
@@ -540,6 +541,16 @@ final class EnforceCommandTest extends TestCase
         self::assertStringContainsString('Use only one of --report, --semgrep-report, or --phpstan-report.', $tester->getDisplay(true));
     }
 
+    public function testDecisionYamlWithRulesProducesValidYamlWhenPathsAndRulesAreEmpty(): void
+    {
+        $parsed = Yaml::parse($this->decisionYamlWithRules('DEC-0999', 'Empty lists remain valid YAML', [], []));
+
+        self::assertIsArray($parsed);
+        self::assertSame([], $parsed['scope']['paths']);
+        self::assertSame([], $parsed['rules']['forbid']);
+        self::assertSame([], $parsed['rules']['allow']);
+    }
+
     public function testJsonFormatReturnsStructuredErrorForInvalidReport(): void
     {
         $projectDir = $this->createTempProjectDir();
@@ -740,32 +751,42 @@ final class EnforceCommandTest extends TestCase
      */
     private function decisionYamlWithRules(string $id, string $title, array $paths, array $forbidRules): string
     {
-        $yamlPaths = '';
-        foreach ($paths as $path) {
-            $yamlPaths .= "    - {$path}\n";
+        $lines = [
+            "id: {$id}",
+            "title: {$title}",
+            'status: active',
+            "date: '2026-03-19'",
+            'scope:',
+            '    type: path',
+        ];
+
+        if ($paths === []) {
+            $lines[] = '    paths: []';
+        } else {
+            $lines[] = '    paths:';
+            foreach ($paths as $path) {
+                $lines[] = "        - {$path}";
+            }
         }
 
-        $yamlRules = '';
-        foreach ($forbidRules as $rule) {
-            $yamlRules .= "    - {$rule}\n";
+        $lines[] = 'decision:';
+        $lines[] = '    summary: Keep ORM out of the domain layer.';
+        $lines[] = '    rationale:';
+        $lines[] = '        - Preserve persistence ignorance.';
+        $lines[] = 'rules:';
+
+        if ($forbidRules === []) {
+            $lines[] = '    forbid: []';
+        } else {
+            $lines[] = '    forbid:';
+            foreach ($forbidRules as $rule) {
+                $lines[] = "        - {$rule}";
+            }
         }
 
-        return <<<YAML
-id: {$id}
-title: {$title}
-status: active
-date: '2026-03-19'
-scope:
-    type: path
-    paths:
-{$yamlPaths}decision:
-    summary: Keep ORM out of the domain layer.
-    rationale:
-        - Preserve persistence ignorance.
-rules:
-    forbid:
-{$yamlRules}    allow: []
-YAML;
+        $lines[] = '    allow: []';
+
+        return implode("\n", $lines) . "\n";
     }
 
     private function writeFile(string $path, string $contents): void

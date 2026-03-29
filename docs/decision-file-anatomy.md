@@ -69,11 +69,13 @@ scope:
 	type: global|path|module
 	paths:
 		- 'src/Order/*'
+		- 'src/Order/**/*'
 ```
 
 - `type: global` means “applies everywhere”; omit `paths`.
 - `type: path` uses glob matching (`fnmatch`) against repo-relative paths.
 	- Prefer forward slashes: `src/Order/*`
+	- When you want both direct files and nested subdirectories, include both patterns explicitly: `src/Order/*` and `src/Order/**/*`.
 	- Use patterns that are hard to misinterpret.
 - If you want to scope by module later, keep module boundaries reflected in the path patterns.
 
@@ -101,6 +103,7 @@ examples:
 		- 'src/Infrastructure/Persistence/Doctrine/*'
 	forbidden:
 		- 'src/Order/*'
+		- 'src/Order/**/*'
 ```
 
 - Use real paths from your repo; examples help onboarding.

@@ -7,6 +7,7 @@ scope:
   type: path
   paths:
     - 'src/Order/*'
+    - 'src/Order/**/*'
 
 decision:
   summary: >
@@ -28,6 +29,7 @@ examples:
     - 'src/Infrastructure/Persistence/Doctrine/*'
   forbidden:
     - 'src/Order/*'
+    - 'src/Order/**/*'
 
 rules:
   forbid:
