@@ -41,17 +41,15 @@ final class AnalyzerFindingLoader
      */
     private function extractFindings(mixed $decoded): array
     {
-        $findings = $decoded;
-
-        if (is_array($decoded) && array_key_exists('findings', $decoded)) {
-            $findings = $decoded['findings'];
+        if (is_array($decoded) && array_is_list($decoded)) {
+            return array_values($decoded);
         }
 
-        if (!is_array($findings)) {
-            throw new InvalidArgumentException('Enforcement report must be a JSON array or an object with a findings array.');
+        if (is_array($decoded) && array_key_exists('findings', $decoded) && is_array($decoded['findings'])) {
+            return array_values($decoded['findings']);
         }
 
-        return array_values($findings);
+        throw new InvalidArgumentException('Enforcement report must be a JSON array or an object with a findings array.');
     }
 
     /**
