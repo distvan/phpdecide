@@ -23,7 +23,7 @@ final class PhpStanFindingLoader
         foreach ($this->generalErrorFindings($decoded['errors'] ?? []) as $errorFinding) {
             $findings[] = $errorFinding;
         }
-    
+
         return $findings;
     }
 
