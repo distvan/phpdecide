@@ -18,8 +18,12 @@ final class JsonFileDecoder
             throw new InvalidArgumentException(sprintf('%s not found: %s', $label, $filePath));
         }
 
-        $contents = file_get_contents($filePath);
-        if ($contents === false) {
+        if (!is_readable($filePath)) {
+            throw new InvalidArgumentException(sprintf('Unable to read %s: %s', strtolower($label), $filePath));
+        }
+
+        $contents = $this->trapWarnings(static fn() => file_get_contents($filePath));
+        if (!is_string($contents)) {
             throw new InvalidArgumentException(sprintf('Unable to read %s: %s', strtolower($label), $filePath));
         }
 
@@ -59,6 +63,26 @@ final class JsonFileDecoder
         }
 
         return $contents;
+    }
+
+    private function trapWarnings(callable $fn): mixed
+    {
+        $hadWarning = false;
+        set_error_handler(
+            static function (int $_) use (&$hadWarning): bool {
+                $hadWarning = true;
+                return true;
+            },
+            E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE
+        );
+
+        try {
+            $result = $fn();
+        } finally {
+            restore_error_handler();
+        }
+
+        return $hadWarning ? null : $result;
     }
 }
 
