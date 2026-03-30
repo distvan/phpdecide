@@ -84,7 +84,7 @@ function normalizeInputEncoding(string $contents): string
     );
 
     if ($encoding === false) {
-        return $contents;
+        return removeUtf8Bom($contents);
     }
 
     $normalized = $encoding === 'UTF-8'
