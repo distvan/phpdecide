@@ -198,7 +198,7 @@ final class EnforceCommandTest extends TestCase
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
         self::assertIsString($json);
 
-        file_put_contents($reportPath, mb_convert_encoding($json, 'UTF-16LE', 'UTF-8'));
+        $this->writeFile($reportPath, mb_convert_encoding($json, 'UTF-16LE', 'UTF-8'));
 
         $tester = new CommandTester(new EnforceCommand());
         $exitCode = $tester->execute([
@@ -304,7 +304,7 @@ final class EnforceCommandTest extends TestCase
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
         self::assertIsString($json);
 
-        file_put_contents($reportPath, mb_convert_encoding($json, 'UTF-16LE', 'UTF-8'));
+        $this->writeFile($reportPath, mb_convert_encoding($json, 'UTF-16LE', 'UTF-8'));
 
         $tester = new CommandTester(new EnforceCommand());
         $exitCode = $tester->execute([
@@ -398,7 +398,7 @@ final class EnforceCommandTest extends TestCase
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
         self::assertIsString($json);
 
-        file_put_contents($reportPath, mb_convert_encoding($json, 'UTF-16LE', 'UTF-8'));
+        $this->writeFile($reportPath, mb_convert_encoding($json, 'UTF-16LE', 'UTF-8'));
 
         $tester = new CommandTester(new EnforceCommand());
         $exitCode = $tester->execute([
