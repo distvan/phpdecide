@@ -66,10 +66,10 @@ Extra fields are allowed in YAML, but are currently ignored by the loader.
 
 ```yaml
 scope:
-	type: global|path|module
-	paths:
-		- 'src/Order/*'
-		- 'src/Order/**/*'
+    type: global|path|module
+    paths:
+        - 'src/Order/*'
+        - 'src/Order/**/*'
 ```
 
 - `type: global` means “applies everywhere”; omit `paths`.
@@ -120,7 +120,7 @@ rules:
 
 - Rules should be **machine-oriented**: stable tokens that can be checked automatically.
 - Prefer a small number of strong rules over many weak ones.
-- In `v1.3.0`, the `enforce` command matches external analyzer findings by comparing the finding `rule_id` to `rules.forbid`, after scope filtering.
+- As of `v1.3.0`, enforcement is implemented for `rules.forbid`: the `enforce` command matches external analyzer findings by comparing the finding `rule_id` to `rules.forbid`, after scope filtering.
 - See [semgrep/rules/no-orm-in-order-domain.yaml](../semgrep/rules/no-orm-in-order-domain.yaml) for a checked-in example where the Semgrep rule ID matches the decision token `doctrine/orm`.
 - See [semgrep/rules/no-business-logic-in-templates.yaml](../semgrep/rules/no-business-logic-in-templates.yaml) for a second example token pairing using `twig/business-logic`. In your own project, record the matching token in a decision file under `.decisions/`.
 
