@@ -32,7 +32,7 @@ Required top-level fields:
 Optional top-level fields (currently supported by the parser/model):
 
 - `examples` (object) – allowed/forbidden examples
-- `rules` (object) – allow/forbid rule keywords (future: enforcement)
+- `rules` (object) – allow/forbid rule keywords
 - `references` (object) – links to issues/commits/ADRs
 - `ai` (object) – AI-friendly metadata for explanations
 
