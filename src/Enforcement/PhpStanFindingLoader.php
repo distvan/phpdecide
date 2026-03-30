@@ -19,10 +19,11 @@ final class PhpStanFindingLoader
         $decoded = (new JsonFileDecoder())->decodeFile($filePath, 'PHPStan report');
         $this->assertReportShape($decoded);
 
-        $findings = [];
-        $findings = array_merge($findings, $this->fileFindings($decoded['files']));
-        $findings = array_merge($findings, $this->generalErrorFindings($decoded['errors']));
-
+        $findings = $this->fileFindings($decoded['files']);
+        foreach ($this->generalErrorFindings($decoded['errors'] ?? []) as $errorFinding) {
+            $findings[] = $errorFinding;
+        }
+        
         return $findings;
     }
 

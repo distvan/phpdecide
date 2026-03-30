@@ -220,9 +220,10 @@ final class EnforceCommand extends Command
 
     private function renderJsonResult(OutputInterface $output, EnforcementMatchResult $result): int
     {
-        $exitCode = $result->hasViolations() ? Command::FAILURE : Command::SUCCESS;
+        $hasViolations = $result->hasViolations();
+        $exitCode = $hasViolations ? Command::FAILURE : Command::SUCCESS;
         $payload = [
-            'ok' => !$result->hasViolations(),
+            'ok' => !$hasViolations,
             'summary' => [
                 'decision_count' => count($result->violationsByDecisionId()),
                 'violation_count' => $result->totalViolations(),
