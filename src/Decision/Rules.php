@@ -21,17 +21,17 @@ final class Rules
 
     /** @var list<string> */
     private readonly array $allow;
-    
+
     public function forbid(): array
     {
         return $this->forbid;
     }
-    
+
     public function allow(): array
     {
         return $this->allow;
     }
-    
+
     public function hasRules(): bool
     {
         return !empty($this->forbid) || !empty($this->allow);
