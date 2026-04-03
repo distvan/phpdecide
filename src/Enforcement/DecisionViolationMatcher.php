@@ -42,7 +42,63 @@ final class DecisionViolationMatcher
             }
         }
 
-        return new EnforcementMatchResult($violationsByDecisionId, $unmappedFindings);
+        return new EnforcementMatchResult(
+            $this->sortViolationsByDecisionId($violationsByDecisionId),
+            $this->sortFindings($unmappedFindings),
+        );
+    }
+
+    /**
+     * @param array<string, list<DecisionViolation>> $violationsByDecisionId
+     * @return array<string, list<DecisionViolation>>
+     */
+    private function sortViolationsByDecisionId(array $violationsByDecisionId): array
+    {
+        foreach ($violationsByDecisionId as $decisionId => $violations) {
+            usort(
+                $violations,
+                fn(DecisionViolation $left, DecisionViolation $right): int => $this->compareFindings($left->finding(), $right->finding())
+            );
+
+            $violationsByDecisionId[$decisionId] = $violations;
+        }
+
+        ksort($violationsByDecisionId);
+
+        return $violationsByDecisionId;
+    }
+
+    /**
+     * @param list<AnalyzerFinding> $findings
+     * @return list<AnalyzerFinding>
+     */
+    private function sortFindings(array $findings): array
+    {
+        usort(
+            $findings,
+            fn(AnalyzerFinding $left, AnalyzerFinding $right): int => $this->compareFindings($left, $right)
+        );
+
+        return $findings;
+    }
+
+    private function compareFindings(AnalyzerFinding $left, AnalyzerFinding $right): int
+    {
+        return [
+            $left->path(),
+            $left->line() ?? -1,
+            $left->tool(),
+            $left->ruleId(),
+            $left->severity() ?? '',
+            $left->message(),
+        ] <=> [
+            $right->path(),
+            $right->line() ?? -1,
+            $right->tool(),
+            $right->ruleId(),
+            $right->severity() ?? '',
+            $right->message(),
+        ];
     }
 
     private function matchesDecision(Decision $decision, AnalyzerFinding $finding): bool

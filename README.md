@@ -299,13 +299,16 @@ If you want a starting point, this repository includes visible example decision 
 
 The command fails when it finds decision-linked violations, which makes it suitable for CI.
 
+By default, `enforce` uses the same decision cache as `explain` and may create or refresh `.decisions/.phpdecide-decisions.cache` during a run. Disable cache writes for read-only CI jobs or debugging with either `--no-cache` or `PHPDECIDE_DECISIONS_CACHE=0`.
+
 ### Decision loading cache (optional)
 
-By default, `explain` caches parsed decisions in `.decisions/.phpdecide-decisions.cache` to speed up repeated runs.
+By default, `explain` and `enforce` cache parsed decisions in `.decisions/.phpdecide-decisions.cache` to speed up repeated runs.
 
 Disable cache if you are debugging loader behavior:
 
 - CLI: `php ./bin/phpdecide explain "Why no ORMs?" --no-cache`
+- CLI: `php ./bin/phpdecide enforce --report build/phpdecide-findings.json --no-cache`
 - Env: set `PHPDECIDE_DECISIONS_CACHE=0`
 
 ### AI configuration (optional)

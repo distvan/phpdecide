@@ -29,6 +29,7 @@ use Throwable;
 )]
 final class EnforceCommand extends Command
 {
+    private const ENV_DECISIONS_CACHE = 'PHPDECIDE_DECISIONS_CACHE';
     private const FORMAT_TEXT = 'text';
     private const FORMAT_JSON = 'json';
     private const JSON_FALLBACK_ERROR = '{"ok":false,"error":"Unable to render enforcement output."}';
@@ -71,6 +72,13 @@ final class EnforceCommand extends Command
             'Output format: text or json.',
             self::FORMAT_TEXT
         );
+
+        $this->addOption(
+            'no-cache',
+            null,
+            InputOption::VALUE_NONE,
+            'Disable decision cache (forces re-reading and re-parsing YAML files).'
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -80,6 +88,14 @@ final class EnforceCommand extends Command
         $semgrepReportPath = (string) $input->getOption('semgrep-report');
         $phpStanReportPath = (string) $input->getOption('phpstan-report');
         $format = $this->normalizeFormat((string) $input->getOption('format'));
+        $noCache = (bool) $input->getOption('no-cache');
+        $envDecisionsCache = getenv(self::ENV_DECISIONS_CACHE);
+        $envCacheEnabled = true;
+        if ($envDecisionsCache !== false && $envDecisionsCache !== '') {
+            $envCacheEnabled = !in_array(strtolower(trim((string) $envDecisionsCache)), ['0', 'false', 'no', 'off'], true);
+        }
+
+        $enableCache = !$noCache && $envCacheEnabled;
 
         $validationError = $this->validateInputs($dir, $reportPath, $semgrepReportPath, $phpStanReportPath, $format);
         if ($validationError !== null) {
@@ -87,7 +103,7 @@ final class EnforceCommand extends Command
         }
 
         try {
-            $repository = new FileDecisionRepository(new YamlDecisionLoader($dir));
+            $repository = new FileDecisionRepository(new YamlDecisionLoader($dir, enableCache: $enableCache));
             $findings = $this->loadFindings($reportPath, $semgrepReportPath, $phpStanReportPath);
             $result = (new DecisionViolationMatcher())->match($repository, $findings);
         } catch (Throwable $e) {

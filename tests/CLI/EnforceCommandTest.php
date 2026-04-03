@@ -16,8 +16,17 @@ use Symfony\Component\Yaml\Yaml;
 
 final class EnforceCommandTest extends TestCase
 {
+    private const ENV_DECISIONS_CACHE = 'PHPDECIDE_DECISIONS_CACHE';
+
     /** @var list<string> */
     private array $tempDirs = [];
+
+    private string|false $originalDecisionsCacheEnv;
+
+    protected function setUp(): void
+    {
+        $this->originalDecisionsCacheEnv = getenv(self::ENV_DECISIONS_CACHE);
+    }
 
     public function testFailsWhenReportContainsDecisionLinkedViolations(): void
     {
@@ -582,6 +591,190 @@ final class EnforceCommandTest extends TestCase
         self::assertStringContainsString('Use only one of --report, --semgrep-report, or --phpstan-report.', $tester->getDisplay(true));
     }
 
+    public function testDeterministicallyOrdersViolationsAndUnmappedFindingsAcrossOutputs(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'findings.json';
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0009-no-billing-api.yaml',
+            $this->decisionYamlWithRules('DEC-0009', 'No billing API client in Billing domain', ['src/Billing/*'], ['billing/api-client'])
+        );
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0003-no-orm.yaml',
+            $this->decisionYamlWithRules('DEC-0003', 'No ORM in Order domain', ['src/Order/*'], ['doctrine/orm'])
+        );
+
+        $this->writeFile(
+            $reportPath,
+            json_encode([
+                'findings' => [
+                    [
+                        'tool' => 'semgrep',
+                        'rule_id' => 'unmapped/z-rule',
+                        'path' => 'src/Zeta/Feature.php',
+                        'line' => 20,
+                        'message' => 'Later unmapped finding.',
+                    ],
+                    [
+                        'tool' => 'semgrep',
+                        'rule_id' => 'billing/api-client',
+                        'path' => 'src/Billing/BillingService.php',
+                        'line' => 8,
+                        'message' => 'Billing API client detected.',
+                    ],
+                    [
+                        'tool' => 'semgrep',
+                        'rule_id' => 'doctrine/orm',
+                        'path' => 'src/Order/OrderService.php',
+                        'line' => 40,
+                        'message' => 'Later ORM usage detected.',
+                    ],
+                    [
+                        'tool' => 'phpstan',
+                        'rule_id' => 'unmapped/a-rule',
+                        'path' => 'src/Alpha/Feature.php',
+                        'line' => 2,
+                        'message' => 'Earlier unmapped finding.',
+                    ],
+                    [
+                        'tool' => 'ztool',
+                        'rule_id' => 'doctrine/orm',
+                        'path' => 'src/Order/OrderService.php',
+                        'line' => 12,
+                        'message' => 'Same line, later tool sort key.',
+                    ],
+                    [
+                        'tool' => 'atool',
+                        'rule_id' => 'doctrine/orm',
+                        'path' => 'src/Order/OrderService.php',
+                        'line' => 12,
+                        'message' => 'Same line, earlier tool sort key.',
+                    ],
+                ],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+        );
+
+        $textTester = new CommandTester(new EnforceCommand());
+        $textExitCode = $textTester->execute([
+            '--dir' => $decisionsDir,
+            '--report' => $reportPath,
+        ]);
+
+        self::assertSame(Command::FAILURE, $textExitCode);
+
+        $display = $textTester->getDisplay(true);
+        $dec0003Position = strpos($display, '[DEC-0003] No ORM in Order domain');
+        $dec0009Position = strpos($display, '[DEC-0009] No billing API client in Billing domain');
+        $atoolPosition = strpos($display, 'src/Order/OrderService.php:12 [doctrine/orm via atool] Same line, earlier tool sort key.');
+        $ztoolPosition = strpos($display, 'src/Order/OrderService.php:12 [doctrine/orm via ztool] Same line, later tool sort key.');
+        $laterLinePosition = strpos($display, 'src/Order/OrderService.php:40 [doctrine/orm via semgrep] Later ORM usage detected.');
+
+        self::assertIsInt($dec0003Position);
+        self::assertIsInt($dec0009Position);
+        self::assertIsInt($atoolPosition);
+        self::assertIsInt($ztoolPosition);
+        self::assertIsInt($laterLinePosition);
+        self::assertLessThan($dec0009Position, $dec0003Position);
+        self::assertLessThan($ztoolPosition, $atoolPosition);
+        self::assertLessThan($laterLinePosition, $ztoolPosition);
+
+        $jsonTester = new CommandTester(new EnforceCommand());
+        $jsonExitCode = $jsonTester->execute([
+            '--dir' => $decisionsDir,
+            '--report' => $reportPath,
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(Command::FAILURE, $jsonExitCode);
+
+        $payload = $this->decodeJsonOutput($jsonTester->getDisplay(true));
+        self::assertSame('DEC-0003', $payload['violations_by_decision'][0]['decision_id']);
+        self::assertSame('DEC-0009', $payload['violations_by_decision'][1]['decision_id']);
+        self::assertSame('atool', $payload['violations_by_decision'][0]['violations'][0]['tool']);
+        self::assertSame('ztool', $payload['violations_by_decision'][0]['violations'][1]['tool']);
+        self::assertSame(40, $payload['violations_by_decision'][0]['violations'][2]['line']);
+        self::assertSame('src/Alpha/Feature.php', $payload['unmapped_findings'][0]['path']);
+        self::assertSame('src/Zeta/Feature.php', $payload['unmapped_findings'][1]['path']);
+    }
+
+    public function testNoCacheOptionPreventsDecisionCacheWrites(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'findings.json';
+        $cachePath = $decisionsDir . DIRECTORY_SEPARATOR . '.phpdecide-decisions.cache';
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0003-no-orm.yaml',
+            $this->decisionYamlWithRules('DEC-0003', 'No ORM in Order domain', ['src/Order/*'], ['doctrine/orm'])
+        );
+
+        $this->writeFile(
+            $reportPath,
+            json_encode([
+                'findings' => [[
+                    'tool' => 'semgrep',
+                    'rule_id' => 'doctrine/orm',
+                    'path' => 'src/Order/OrderService.php',
+                    'line' => 12,
+                    'severity' => 'error',
+                    'message' => 'Doctrine ORM import detected.',
+                ]],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+        );
+
+        $tester = new CommandTester(new EnforceCommand());
+        $exitCode = $tester->execute([
+            '--dir' => $decisionsDir,
+            '--report' => $reportPath,
+            '--no-cache' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertFileDoesNotExist($cachePath);
+    }
+
+    public function testDecisionsCacheEnvironmentVariableDisablesCacheWrites(): void
+    {
+        putenv(self::ENV_DECISIONS_CACHE . '=0');
+
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'findings.json';
+        $cachePath = $decisionsDir . DIRECTORY_SEPARATOR . '.phpdecide-decisions.cache';
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0003-no-orm.yaml',
+            $this->decisionYamlWithRules('DEC-0003', 'No ORM in Order domain', ['src/Order/*'], ['doctrine/orm'])
+        );
+
+        $this->writeFile(
+            $reportPath,
+            json_encode([
+                'findings' => [[
+                    'tool' => 'semgrep',
+                    'rule_id' => 'doctrine/orm',
+                    'path' => 'src/Order/OrderService.php',
+                    'line' => 12,
+                    'severity' => 'error',
+                    'message' => 'Doctrine ORM import detected.',
+                ]],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+        );
+
+        $tester = new CommandTester(new EnforceCommand());
+        $exitCode = $tester->execute([
+            '--dir' => $decisionsDir,
+            '--report' => $reportPath,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertFileDoesNotExist($cachePath);
+    }
+
     public function testDecisionYamlWithRulesProducesValidYamlWhenPathsAndRulesAreEmpty(): void
     {
         $parsed = Yaml::parse($this->decisionYamlWithRules('DEC-0999', 'Empty lists remain valid YAML', [], []));
@@ -761,6 +954,12 @@ final class EnforceCommandTest extends TestCase
 
     protected function tearDown(): void
     {
+        if ($this->originalDecisionsCacheEnv !== false && $this->originalDecisionsCacheEnv !== '') {
+            putenv(self::ENV_DECISIONS_CACHE . '=' . $this->originalDecisionsCacheEnv);
+        } else {
+            putenv(self::ENV_DECISIONS_CACHE);
+        }
+
         foreach ($this->tempDirs as $dir) {
             if (is_dir($dir)) {
                 $this->removeDirRecursive($dir);
