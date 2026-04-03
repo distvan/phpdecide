@@ -277,6 +277,39 @@ YAML
         self::assertStringContainsString('ai.keywords[0] must be a non-empty string', $display);
     }
 
+        public function testDoesNotDuplicateRulesForbidErrorsAfterArrayValidationFails(): void
+        {
+                $projectDir = $this->createTempProjectDir();
+                $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+
+                $this->writeFile(
+                        $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0001-invalid-rules.yaml',
+                        <<<YAML
+id: DEC-0001
+title: Invalid rules
+status: active
+date: '2026-02-03'
+scope:
+    type: global
+decision:
+    summary: Something
+    rationale:
+        - Because.
+rules:
+    forbid:
+        - ''
+YAML
+                );
+
+                $tester = new CommandTester(new DecisionsLintCommand());
+                $exitCode = $tester->execute(['--dir' => $decisionsDir]);
+
+                self::assertSame(Command::FAILURE, $exitCode);
+
+                $display = $tester->getDisplay(true);
+                self::assertSame(1, substr_count($display, 'rules.forbid[0] must be a non-empty string'));
+        }
+
     public function testDefaultsToProjectDecisionsDirWhenDirOptionIsEmptyString(): void
     {
         $projectDir = $this->createTempProjectDir();

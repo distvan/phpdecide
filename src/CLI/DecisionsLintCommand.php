@@ -165,7 +165,12 @@ final class DecisionsLintCommand extends Command
                 continue;
             }
 
-            $errors = array_merge($errors, $this->validateDecisionArrays($data, $fileLabel));
+            $validationErrors = $this->validateDecisionArrays($data, $fileLabel);
+            $errors = array_merge($errors, $validationErrors);
+
+            if ($validationErrors !== []) {
+                continue;
+            }
 
             try {
                 $decision = DecisionFactory::fromArray($data);
