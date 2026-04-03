@@ -225,7 +225,7 @@ final class EnforceCommand extends Command
         $payload = [
             'ok' => !$hasViolations,
             'summary' => [
-                'decision_count' => count($result->violationsByDecisionId()),
+                'violating_decision_count' => count($result->violationsByDecisionId()),
                 'violation_count' => $result->totalViolations(),
                 'unmapped_finding_count' => count($result->unmappedFindings()),
             ],

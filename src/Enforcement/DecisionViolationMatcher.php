@@ -17,10 +17,16 @@ final class DecisionViolationMatcher
         $violationsByDecisionId = [];
         $unmappedFindings = [];
 
+        $applicableDecisionsByPath = [];
         foreach ($findings as $finding) {
             $matched = false;
+            $path = $finding->path();
+            
+            if (!array_key_exists($path, $applicableDecisionsByPath)) {
+                $applicableDecisionsByPath[$path] = $repository->applicableTo($path);
+            }
 
-            foreach ($repository->applicableTo($finding->path()) as $decision) {
+            foreach ($applicableDecisionsByPath[$path] as $decision) {
                 if (!$this->matchesDecision($decision, $finding)) {
                     continue;
                 }

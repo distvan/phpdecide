@@ -94,12 +94,53 @@ final class EnforceCommandTest extends TestCase
 
         $payload = $this->decodeJsonOutput($tester->getDisplay(true));
         self::assertFalse($payload['ok']);
-        self::assertSame(1, $payload['summary']['decision_count']);
+        self::assertSame(1, $payload['summary']['violating_decision_count']);
         self::assertSame(1, $payload['summary']['violation_count']);
         self::assertSame('DEC-0003', $payload['violations_by_decision'][0]['decision_id']);
         self::assertSame('No ORM in Order domain', $payload['violations_by_decision'][0]['decision_title']);
         self::assertSame('doctrine/orm', $payload['violations_by_decision'][0]['violations'][0]['rule_id']);
         self::assertSame('src/Order/OrderService.php', $payload['violations_by_decision'][0]['violations'][0]['path']);
+    }
+
+    public function testJsonFormatMatchesDecisionRulesAfterTrimmingRuleTokens(): void
+    {
+        $projectDir = $this->createTempProjectDir();
+        $decisionsDir = $projectDir . DIRECTORY_SEPARATOR . PhpDecideDefaults::DECISIONS_DIR;
+        $reportPath = $projectDir . DIRECTORY_SEPARATOR . 'findings.json';
+
+        $this->writeFile(
+            $decisionsDir . DIRECTORY_SEPARATOR . 'DEC-0003-no-orm.yaml',
+            $this->decisionYamlWithRules('DEC-0003', 'No ORM in Order domain', ['src/Order/*'], [' doctrine/orm '])
+        );
+
+        $this->writeFile(
+            $reportPath,
+            json_encode([
+                'findings' => [[
+                    'tool' => 'semgrep',
+                    'rule_id' => 'doctrine/orm',
+                    'path' => 'src/Order/OrderService.php',
+                    'line' => 12,
+                    'severity' => 'error',
+                    'message' => 'Doctrine ORM import detected.',
+                ]],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+        );
+
+        $tester = new CommandTester(new EnforceCommand());
+        $exitCode = $tester->execute([
+            '--dir' => $decisionsDir,
+            '--report' => $reportPath,
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+
+        $payload = $this->decodeJsonOutput($tester->getDisplay(true));
+        self::assertFalse($payload['ok']);
+        self::assertSame(1, $payload['summary']['violating_decision_count']);
+        self::assertSame('DEC-0003', $payload['violations_by_decision'][0]['decision_id']);
+        self::assertSame('doctrine/orm', $payload['violations_by_decision'][0]['violations'][0]['rule_id']);
     }
 
     public function testSucceedsWhenFindingsDoNotMapToScopedDecisionRules(): void
@@ -168,7 +209,7 @@ final class EnforceCommandTest extends TestCase
 
         $payload = $this->decodeJsonOutput($tester->getDisplay(true));
         self::assertTrue($payload['ok']);
-        self::assertSame(0, $payload['summary']['decision_count']);
+        self::assertSame(0, $payload['summary']['violating_decision_count']);
         self::assertSame(0, $payload['summary']['violation_count']);
         self::assertSame(1, $payload['summary']['unmapped_finding_count']);
         self::assertCount(0, $payload['violations_by_decision']);
@@ -462,7 +503,7 @@ final class EnforceCommandTest extends TestCase
 
         $payload = $this->decodeJsonOutput($tester->getDisplay(true));
         self::assertFalse($payload['ok']);
-        self::assertSame(1, $payload['summary']['decision_count']);
+        self::assertSame(1, $payload['summary']['violating_decision_count']);
         self::assertSame(1, $payload['summary']['violation_count']);
         self::assertSame(0, $payload['summary']['unmapped_finding_count']);
         self::assertSame('DEC-0005', $payload['violations_by_decision'][0]['decision_id']);

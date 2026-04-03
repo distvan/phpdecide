@@ -196,6 +196,12 @@ When `--format json` is used, the command emits a structured payload with:
 - `violations_by_decision`
 - `unmapped_findings`
 
+The `summary` object contains:
+
+- `violating_decision_count`: number of decision IDs that have at least one matched violation
+- `violation_count`: total number of matched violations across all decisions
+- `unmapped_finding_count`: number of analyzer findings that did not map to an active scoped decision rule
+
 The exit code behavior does not change: matched decision violations still produce a non-zero exit code.
 
 The checked-in GitHub Actions example now demonstrates the full structured path:
