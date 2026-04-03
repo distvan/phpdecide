@@ -20,7 +20,7 @@ final class DecisionViolationMatcher
         $applicableDecisionsByPath = [];
         foreach ($findings as $finding) {
             $matched = false;
-            $path = $finding->path();
+            $path = $this->normalizeFindingPath($finding->path());
 
             if (!array_key_exists($path, $applicableDecisionsByPath)) {
                 $applicableDecisionsByPath[$path] = $repository->applicableTo($path);
@@ -99,6 +99,17 @@ final class DecisionViolationMatcher
             $right->severity() ?? '',
             $right->message(),
         ];
+    }
+
+    private function normalizeFindingPath(string $path): string
+    {
+        $normalizedPath = str_replace('\\', '/', trim($path));
+
+        while (str_starts_with($normalizedPath, './')) {
+            $normalizedPath = substr($normalizedPath, 2);
+        }
+
+        return $normalizedPath;
     }
 
     private function matchesDecision(Decision $decision, AnalyzerFinding $finding): bool

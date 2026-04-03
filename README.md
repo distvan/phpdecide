@@ -183,6 +183,8 @@ Initial mapping behavior:
 - scope must match the finding path
 - the finding `rule_id` must equal a token listed in `rules.forbid`
 
+Analyzer report paths are normalized for scope matching, so Windows-style separators and leading `./` do not prevent a finding from matching path-based decision scopes.
+
 This gives CI a stable way to print violations grouped by decision ID without forcing PHPDecide to own static analysis itself.
 For Semgrep, PHPDecide reads native `results[*].check_id`, `path`, `start.line`, and `extra.message` / `extra.severity` fields and converts them internally.
 For PHPStan, PHPDecide reads native `files[*].messages[*]` entries and maps the message `identifier` field to the decision token in `rules.forbid`.
