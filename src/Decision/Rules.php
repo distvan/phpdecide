@@ -47,12 +47,12 @@ final class Rules
 
         foreach ($tokens as $index => $token) {
             if (!is_string($token)) {
-                throw new InvalidArgumentException(sprintf('%s[%d] must be a non-empty string.', $field, (int) $index));
+                throw new InvalidArgumentException(sprintf('%s[%s] must be a non-empty string.', $field, (string) $index));
             }
 
             $token = trim($token);
             if ($token === '') {
-                throw new InvalidArgumentException(sprintf('%s[%d] must be a non-empty string.', $field, (int) $index));
+                throw new InvalidArgumentException(sprintf('%s[%s] must be a non-empty string.', $field, (string) $index));
             }
 
             $normalized[] = $token;

@@ -21,7 +21,7 @@ final class DecisionViolationMatcher
         foreach ($findings as $finding) {
             $matched = false;
             $path = $finding->path();
-            
+
             if (!array_key_exists($path, $applicableDecisionsByPath)) {
                 $applicableDecisionsByPath[$path] = $repository->applicableTo($path);
             }
