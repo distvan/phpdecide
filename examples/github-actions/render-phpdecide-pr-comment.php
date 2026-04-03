@@ -120,7 +120,7 @@ function appendSummaryLines(array &$lines, bool $ok, array $summary): void
 {
     $lines[] = '';
     $lines[] = sprintf('- ok: %s', $ok ? 'true' : 'false');
-    $lines[] = sprintf('- decision_count: %d', (int) ($summary['decision_count'] ?? 0));
+    $lines[] = sprintf('- violating_decision_count: %d', (int) ($summary['violating_decision_count'] ?? 0));
     $lines[] = sprintf('- violation_count: %d', (int) ($summary['violation_count'] ?? 0));
     $lines[] = sprintf('- unmapped_finding_count: %d', (int) ($summary['unmapped_finding_count'] ?? 0));
 }
