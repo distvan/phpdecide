@@ -1,0 +1,91 @@
+name: PHPDecide PHPStan Enforcement Example
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  policy:
+    name: Decision enforcement with PHPStan
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1
+        with:
+          php-version: '8.2'
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Stage example decision files
+        run: |
+          mkdir -p build/example-decisions
+          cp examples/decisions/DEC-0005.no-orm-in-order-domain-via-phpstan.yaml build/example-decisions/
+
+      - name: Lint decision files
+        run: php ./bin/phpdecide decisions:lint --dir build/example-decisions --require-any
+
+      - name: Stage a native PHPStan JSON report
+        run: |
+          mkdir -p build
+          cp examples/phpstan/no-orm-in-order-domain-report.json build/phpstan.json
+
+      - name: Map PHPStan findings back to decisions
+        id: phpdecide_enforce
+        run: |
+          set +e
+          php ./bin/phpdecide enforce \
+            --dir build/example-decisions \
+            --phpstan-report build/phpstan.json \
+            --format json \
+            > build/phpdecide-enforce.json
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Summarize decision enforcement
+        if: always()
+        run: |
+          php examples/github-actions/render-phpdecide-pr-comment.php \
+            build/phpdecide-enforce.json \
+            build/phpdecide-comment.md
+          cat build/phpdecide-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Render workflow annotations
+        if: always()
+        run: |
+          php examples/github-actions/render-phpdecide-annotations.php \
+            build/phpdecide-enforce.json \
+            build/phpdecide-annotations.txt
+          cat build/phpdecide-annotations.txt
+
+      - name: Upload decision enforcement JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpdecide-phpstan-enforce-json
+          path: build/phpdecide-enforce.json
+
+      - name: Upload PR comment markdown
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpdecide-phpstan-pr-comment-markdown
+          path: build/phpdecide-comment.md
+
+      - name: Upload annotation commands
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpdecide-phpstan-annotation-commands
+          path: build/phpdecide-annotations.txt
+
+      - name: Fail job on decision-linked violations
+        if: steps.phpdecide_enforce.outputs.exit_code != '0'
+        run: exit 1

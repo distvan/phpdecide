@@ -1,0 +1,48 @@
+id: DEC-0005
+title: No ORM in Order domain via PHPStan
+status: active
+date: '2026-03-19'
+
+scope:
+  type: path
+  paths:
+    - 'examples/fixtures/phpstan/src/Order/*'
+    - 'examples/fixtures/phpstan/src/Order/**/*'
+
+decision:
+  summary: >
+    The Order domain example used for PHPStan enforcement must not depend on
+    Doctrine ORM symbols.
+
+  rationale:
+    - The example keeps the same architecture boundary as the main no-ORM decision, but shows the PHPStan identifier mapping path.
+    - A checked-in, scoped sample is easier to copy into another repository than a docs-only description.
+    - Keeping the violating path under examples preserves a runnable demonstration without asserting policy over application code.
+
+  alternatives:
+    - Document the PHPStan identifier contract without a checked-in example report.
+    - Keep PHPStan support test-only and rely on teams to create their own first mapping.
+
+examples:
+  allowed:
+    - 'examples/fixtures/phpstan/src/Infrastructure/Persistence/Doctrine/OrderRecord.php'
+  forbidden:
+    - 'examples/fixtures/phpstan/src/Order/OrderService.php'
+
+rules:
+  forbid:
+    - 'phpstan.doctrine.orm'
+  allow: []
+
+references:
+  issues: []
+  commits: []
+  adr: null
+
+ai:
+  explain_style: 'Explain as an architecture mentor: focus on keeping PHP-specific dependency rules aligned with recorded decisions.'
+  keywords:
+    - 'phpstan'
+    - 'orm'
+    - 'domain boundary'
+    - 'architecture rule'

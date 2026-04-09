@@ -7,6 +7,7 @@ namespace PhpDecide\Tests\Decision;
 use InvalidArgumentException;
 use PhpDecide\Decision\Decision;
 use PhpDecide\Decision\YamlDecisionLoader;
+use PhpDecide\Tests\Support\TestFilesystemException;
 use PHPUnit\Framework\TestCase;
 
 final class YamlDecisionLoaderTest extends TestCase
@@ -160,7 +161,7 @@ YAML;
     {
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phpdecide_tests_' . bin2hex(random_bytes(8));
         if (!mkdir($dir) && !is_dir($dir)) {
-            throw new TempDirectoryCreationFailed("Unable to create temp dir: {$dir}");
+            throw new TestFilesystemException("Unable to create temp dir: {$dir}");
         }
 
         $this->tempDirs[] = $dir;
@@ -184,8 +185,4 @@ YAML;
 
         rmdir($dir);
     }
-}
-
-final class TempDirectoryCreationFailed extends \RuntimeException
-{
 }

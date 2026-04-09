@@ -151,6 +151,20 @@ final class DecisionFactoryTest extends TestCase
         DecisionFactory::fromArray($data);
     }
 
+    public function testFromArrayTrimsRuleTokens(): void
+    {
+        $data = $this->validData();
+        $data['rules'] = [
+            'forbid' => [' doctrine/* '],
+            'allow' => ["\tpdo/*\n"],
+        ];
+
+        $decision = DecisionFactory::fromArray($data);
+
+        self::assertSame(['doctrine/*'], $decision->rules()?->forbid());
+        self::assertSame(['pdo/*'], $decision->rules()?->allow());
+    }
+
     private function validData(): array
     {
         return [

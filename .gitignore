@@ -6,3 +6,12 @@ env.bash.sh
 docs/env.bash.sh
 .env
 .env.*
+
+.decisions
+.vscode
+build
+
+# Ignore Markdown files except the anatomy guide
+docs/*.md
+docs/*.pem
+!docs/decision-file-anatomy.md

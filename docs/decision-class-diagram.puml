@@ -1,6 +1,6 @@
 @startuml
-' PHPDecide - Diagram 1/2
-' Domain model + Explain + CLI
+' PHPDecide - Expanded diagram 1/2
+' Domain model + Explain + Enforcement + CLI
 
 skinparam shadowing false
 skinparam classAttributeIconSize 0
@@ -9,7 +9,7 @@ left to right direction
 
 set namespaceSeparator ::
 
-title PHPDecide - Domain and CLI (src)
+title PHPDecide - Domain, Enforcement and CLI (src)
 
 package PhpDecide::Config {
   class PhpDecideDefaults
@@ -52,6 +52,17 @@ package PhpDecide::Explain {
   class Explanation
 }
 
+package PhpDecide::Enforcement {
+  class AnalyzerFinding
+  class AnalyzerFindingLoader
+  class SemgrepFindingLoader
+  class PhpStanFindingLoader
+  class JsonFileDecoder
+  class DecisionViolation
+  class DecisionViolationMatcher
+  class EnforcementMatchResult
+}
+
 package PhpDecide::AI {
   interface AiClient <<external>>
   class AiClientFactory <<external>>
@@ -60,6 +71,7 @@ package PhpDecide::AI {
 package PhpDecide::CLI {
   class ExplainCommand
   class DecisionsLintCommand
+  class EnforceCommand
 }
 
 ' --- Domain composition ---
@@ -82,8 +94,9 @@ AiClientExplainer ..|> AiExplainer
 ' --- CLI inheritance ---
 ExplainCommand --|> Command
 DecisionsLintCommand --|> Command
+EnforceCommand --|> Command
 
-' --- Dependencies ---
+' --- Domain dependencies ---
 YamlDecisionLoader ..> DecisionFileCollector
 FileDecisionRepository ..> DecisionLoader
 FileDecisionRepository ..> Decision
@@ -110,6 +123,26 @@ Explanation o-- "0..*" Decision
 
 AiClientExplainer ..> AiClient
 
+' --- Enforcement model ---
+DecisionViolation *-- "1" AnalyzerFinding : finding
+DecisionViolation *-- "1" Decision : decision
+EnforcementMatchResult o-- "0..*" DecisionViolation : violationsByDecisionId
+EnforcementMatchResult o-- "0..*" AnalyzerFinding : unmappedFindings
+
+' --- Enforcement dependencies ---
+AnalyzerFindingLoader ..> JsonFileDecoder
+AnalyzerFindingLoader ..> AnalyzerFinding
+SemgrepFindingLoader ..> JsonFileDecoder
+SemgrepFindingLoader ..> AnalyzerFinding
+PhpStanFindingLoader ..> JsonFileDecoder
+PhpStanFindingLoader ..> AnalyzerFinding
+DecisionViolationMatcher ..> DecisionRepository
+DecisionViolationMatcher ..> Decision
+DecisionViolationMatcher ..> AnalyzerFinding
+DecisionViolationMatcher ..> DecisionViolation
+DecisionViolationMatcher ..> EnforcementMatchResult
+
+' --- CLI dependencies ---
 ExplainCommand ..> PhpDecideDefaults
 ExplainCommand ..> YamlDecisionLoader
 ExplainCommand ..> FileDecisionRepository
@@ -123,10 +156,21 @@ DecisionsLintCommand ..> DecisionFactory
 DecisionsLintCommand ..> Yaml
 DecisionsLintCommand ..> ParseException
 
+EnforceCommand ..> PhpDecideDefaults
+EnforceCommand ..> YamlDecisionLoader
+EnforceCommand ..> FileDecisionRepository
+EnforceCommand ..> AnalyzerFindingLoader
+EnforceCommand ..> SemgrepFindingLoader
+EnforceCommand ..> PhpStanFindingLoader
+EnforceCommand ..> DecisionViolationMatcher
+EnforceCommand ..> EnforcementMatchResult
+EnforceCommand ..> AnalyzerFinding
+EnforceCommand ..> DecisionViolation
+
 @enduml
 
 @startuml
-' PHPDecide - Diagram 2/2
+' PHPDecide - Expanded diagram 2/2
 ' AI client + transport + egress guard
 
 skinparam shadowing false
@@ -163,6 +207,7 @@ package PhpDecide::AI::Guard {
   class GuardPolicy
   class GuardPolicyFactory
   class DlpScanner
+  class DlpScannerException
   class Finding
   interface AuditLogger
   class NullAuditLogger
@@ -203,7 +248,9 @@ EgressGuardAiClient ..> DecisionPayloadNormalizer
 EgressGuardAiClient ..> ExplainPromptBuilder
 EgressGuardAiClient ..> AiClientException
 EgressGuardAiClient ..> Decision
+EgressGuardAiClient ..> Finding
 GuardPolicyFactory ..> GuardPolicy
 DlpScanner ..> Finding
+DlpScanner ..> DlpScannerException
 
 @enduml

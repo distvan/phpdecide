@@ -1,0 +1,10 @@
+rules:
+  - id: doctrine/orm
+    message: Doctrine ORM usage is not allowed in the Order domain.
+    severity: ERROR
+    languages:
+      - php
+    paths:
+      include:
+        - src/Order/**/*.php
+    pattern-regex: '(?m)^\s*use\s+Doctrine\\ORM\\'
