@@ -70,6 +70,7 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
   - `PHPDECIDE_AI_OMIT_MODEL` to omit the JSON `model` field when the gateway encodes the model/deployment in the URL.
   - `PHPDECIDE_AI_AUTH_HEADER_NAME` and `PHPDECIDE_AI_AUTH_PREFIX` to support non-Bearer authentication (e.g. `Api-Key: <key>`).
 - Decision loading cache for `.decisions/*.yaml` to speed up repeated runs when files are unchanged.
+  This cache applies to decision files in your project's `.decisions/` directory.
   - New CLI flag: `explain --no-cache`.
   - New env var: `PHPDECIDE_DECISIONS_CACHE=0`.
 
@@ -93,17 +94,17 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 
 ### Highlights
 - First stable release of PHPDecide: decision files as structured, version-controlled project knowledge.
-- CI-friendly linting for `.decisions/*.yaml` (syntax + schema checks).
+- CI-friendly linting for decision files in your project's `.decisions/` directory (syntax + schema checks).
 - “Explain” workflow with optional AI summarization (presentation only; decisions remain the source of truth).
 
 ### Added
 - CLI command `decisions:lint`
-  - Validates `.yaml` decision files in a directory (default: `.decisions/`).
+  - Validates `.yaml` decision files in a directory (default: your project's `.decisions/`).
   - `--require-any` option to fail if no `.yaml` files exist.
   - Detects unsupported `.yml` extension and reports it explicitly.
   - Detects duplicate decision IDs across multiple files.
 - CLI command `explain <question>`
-  - Loads recorded decisions from `.decisions/`.
+  - Loads recorded decisions from your project's `.decisions/` directory.
   - `--path <path>` option to only consider decisions applicable to a specific file path.
   - Optional `--ai` mode to summarize recorded decisions.
   - `--ai-strict` option to fail if AI is enabled but unavailable/errors (default: falls back to plain output).
@@ -129,5 +130,7 @@ This project aims to follow [Keep a Changelog](https://keepachangelog.com/en/1.1
 [1.0.0]: https://github.com/distvan/phpdecide/releases/tag/v1.0.0
 [1.1.0]: https://github.com/distvan/phpdecide/releases/tag/v1.1.0
 [1.2.0]: https://github.com/distvan/phpdecide/releases/tag/v1.2.0
+[1.3.0]: https://github.com/distvan/phpdecide/releases/tag/v1.3.0
+[Unreleased]: https://github.com/distvan/phpdecide/compare/v1.3.0...HEAD
 [1.3.0]: https://github.com/distvan/phpdecide/releases/tag/v1.3.0
 [Unreleased]: https://github.com/distvan/phpdecide/compare/v1.3.0...HEAD

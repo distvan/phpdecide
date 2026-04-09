@@ -6,6 +6,7 @@ namespace PhpDecide\Tests\CLI;
 
 use PhpDecide\CLI\ExplainCommand;
 use PhpDecide\Config\PhpDecideDefaults;
+use PhpDecide\Tests\Support\TestFilesystemException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -24,7 +25,7 @@ final class ExplainCommandTest extends TestCase
     {
         $cwd = getcwd();
         if ($cwd === false) {
-            throw new UnableToDetermineCwd('Unable to determine current working directory.');
+            throw new TestFilesystemException('Unable to determine current working directory.');
         }
 
         $this->originalCwd = $cwd;
@@ -154,7 +155,7 @@ final class ExplainCommandTest extends TestCase
     {
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phpdecide_cli_tests_' . bin2hex(random_bytes(8));
         if (!mkdir($dir) && !is_dir($dir)) {
-            throw new TempDirectoryCreationFailed("Unable to create temp dir: {$dir}");
+            throw new TestFilesystemException("Unable to create temp dir: {$dir}");
         }
 
         $this->tempDirs[] = $dir;
@@ -228,12 +229,4 @@ YAML;
 
         rmdir($dir);
     }
-}
-
-final class UnableToDetermineCwd extends \RuntimeException
-{
-}
-
-final class TempDirectoryCreationFailed extends \RuntimeException
-{
 }

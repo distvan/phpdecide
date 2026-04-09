@@ -12,7 +12,7 @@ This document describes a **recommended structure** that also matches what PHPDe
 
 ## File placement and naming
 
-- Put decisions under `.decisions/` in the repo root.
+- Put decisions under `.decisions/` in your project root.
 - Use the `.yaml` extension (the loader currently loads only `.yaml`, not `.yml`).
 - Keep filenames stable and sortable, e.g.:
 	- `DEC-0001-no-orms.yaml`
@@ -32,7 +32,7 @@ Required top-level fields:
 Optional top-level fields (currently supported by the parser/model):
 
 - `examples` (object) – allowed/forbidden examples
-- `rules` (object) – allow/forbid rule keywords (future: enforcement)
+- `rules` (object) – allow/forbid rule keywords
 - `references` (object) – links to issues/commits/ADRs
 - `ai` (object) – AI-friendly metadata for explanations
 
@@ -66,14 +66,16 @@ Extra fields are allowed in YAML, but are currently ignored by the loader.
 
 ```yaml
 scope:
-	type: global|path|module
-	paths:
-		- 'src/Order/*'
+    type: global|path|module
+    paths:
+        - 'src/Order/*'
+        - 'src/Order/**/*'
 ```
 
 - `type: global` means “applies everywhere”; omit `paths`.
 - `type: path` uses glob matching (`fnmatch`) against repo-relative paths.
 	- Prefer forward slashes: `src/Order/*`
+	- When you want both direct files and nested subdirectories, include both patterns explicitly: `src/Order/*` and `src/Order/**/*`.
 	- Use patterns that are hard to misinterpret.
 - If you want to scope by module later, keep module boundaries reflected in the path patterns.
 
@@ -101,6 +103,7 @@ examples:
 		- 'src/Infrastructure/Persistence/Doctrine/*'
 	forbidden:
 		- 'src/Order/*'
+		- 'src/Order/**/*'
 ```
 
 - Use real paths from your repo; examples help onboarding.
@@ -117,6 +120,9 @@ rules:
 
 - Rules should be **machine-oriented**: stable tokens that can be checked automatically.
 - Prefer a small number of strong rules over many weak ones.
+- As of `v1.3.0`, enforcement is implemented for `rules.forbid`: the `enforce` command matches external analyzer findings by comparing the finding `rule_id` to `rules.forbid`, after scope filtering.
+- See [semgrep/rules/no-orm-in-order-domain.yaml](../semgrep/rules/no-orm-in-order-domain.yaml) for a checked-in example where the Semgrep rule ID matches the decision token `doctrine/orm`.
+- See [semgrep/rules/no-business-logic-in-templates.yaml](../semgrep/rules/no-business-logic-in-templates.yaml) for a second example token pairing using `twig/business-logic`. In your own project, record the matching token in a decision file under `.decisions/`.
 
 ### `references` (optional)
 
@@ -209,4 +215,4 @@ ai:
 
 ## Example
 
-- See [DEC-0003.no-orm-in-order-domain.yaml](DEC-0003.no-orm-in-order-domain.yaml) for a complete example that matches the current schema.
+- See [DEC-0003.no-orm-in-order-domain.yaml](DEC-0003.no-orm-in-order-domain.yaml) for a complete example decision document that matches the current schema.

@@ -1,0 +1,11 @@
+rules:
+  - id: twig/business-logic
+    message: Business logic is not allowed in templates.
+    severity: ERROR
+    languages:
+      - generic
+    paths:
+      include:
+        - examples/fixtures/templates/**/*.twig
+    pattern-regex: '(?m)\b(set|for|if)\b.*\b(total|price|amount|discount|tax|calculate|service|repository)\b'
+

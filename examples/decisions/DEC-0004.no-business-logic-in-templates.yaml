@@ -1,0 +1,48 @@
+id: DEC-0004
+title: No business logic in templates
+status: active
+date: '2026-03-19'
+
+scope:
+  type: path
+  paths:
+    - 'examples/fixtures/templates/*'
+    - 'examples/fixtures/templates/**/*'
+
+decision:
+  summary: >
+    Templates should stay presentation-focused and must not contain business
+    logic or service access.
+
+  rationale:
+    - Business rules embedded in templates are hard to test and easy to duplicate.
+    - Keeping templates simple preserves a clear boundary between rendering and application behavior.
+    - Reviewers can reason about presentation changes faster when domain logic stays outside the view layer.
+
+  alternatives:
+    - Allow lightweight conditional logic directly in templates.
+    - Permit service calls from templates for convenience in small pages.
+
+examples:
+  allowed:
+    - 'examples/fixtures/templates/order/show.html.twig'
+  forbidden:
+    - 'examples/fixtures/templates/order/calculate_total.html.twig'
+
+rules:
+  forbid:
+    - 'twig/business-logic'
+  allow: []
+
+references:
+  issues: []
+  commits: []
+  adr: null
+
+ai:
+  explain_style: 'Explain as a maintainability rule: focus on separation of concerns and reviewability.'
+  keywords:
+    - 'templates'
+    - 'presentation'
+    - 'business logic'
+    - 'separation of concerns'

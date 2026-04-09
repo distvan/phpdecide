@@ -165,6 +165,13 @@ final class DecisionsLintCommand extends Command
                 continue;
             }
 
+            $validationErrors = $this->validateDecisionArrays($data, $fileLabel);
+            $errors = array_merge($errors, $validationErrors);
+
+            if ($validationErrors !== []) {
+                continue;
+            }
+
             try {
                 $decision = DecisionFactory::fromArray($data);
                 $decisions[] = $decision;
@@ -180,8 +187,6 @@ final class DecisionsLintCommand extends Command
                 );
                 continue;
             }
-
-            $errors = array_merge($errors, $this->validateDecisionArrays($data, $fileLabel));
         }
 
         return [$decisions, $errors];

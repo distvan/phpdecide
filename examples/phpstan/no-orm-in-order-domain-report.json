@@ -1,0 +1,19 @@
+{
+    "totals": {
+        "errors": 0,
+        "file_errors": 1
+    },
+    "files": {
+        "examples/fixtures/phpstan/src/Order/OrderService.php": {
+            "errors": 1,
+            "messages": [
+                {
+                    "message": "Doctrine ORM symbol detected in the Order domain example.",
+                    "line": 7,
+                    "identifier": "phpstan.doctrine.orm"
+                }
+            ]
+        }
+    },
+    "errors": []
+}
